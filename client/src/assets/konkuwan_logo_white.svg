@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 78" role="img">
+  <title>Konkuwan Herbs</title>
+  <desc>Konkuwan Herbs logo white — for dark backgrounds</desc>
+  <g transform="translate(26,34)">
+    <ellipse rx="7" ry="22" transform="rotate(0)"   fill="rgba(255,255,255,.88)"/>
+    <ellipse rx="7" ry="22" transform="rotate(45)"  fill="rgba(255,255,255,.45)"/>
+    <ellipse rx="7" ry="22" transform="rotate(90)"  fill="rgba(255,255,255,.88)"/>
+    <ellipse rx="7" ry="22" transform="rotate(135)" fill="rgba(255,255,255,.45)"/>
+    <circle r="6" fill="#E8C56A"/>
+    <circle r="2.5" fill="#9A7820"/>
+  </g>
+  <text font-family="'Cormorant Garamond','Palatino Linotype',Georgia,serif"
+        font-weight="600" font-size="32" fill="#FFFFFF"
+        x="62" y="40" letter-spacing="-.5">Konkuwan</text>
+  <text font-family="'Helvetica Neue',Arial,sans-serif"
+        font-size="13" font-weight="500" fill="#E8C56A"
+        x="62" y="62" letter-spacing="5.5">HERBS</text>
+</svg>

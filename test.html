@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Herbal Supply · B2B Dashboard</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+    <!-- Font Awesome 6 (free) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+    <style>
+        /* ----- RESET & BASE ----- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: #F4EFE6;
+            /* soft cream main */
+            color: #1e1e1e;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ----- SCROLLBAR ----- */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e8e0d5;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #b7a99a;
+            border-radius: 12px;
+        }
+
+        /* ----- SIDEBAR (dark green) ----- */
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
+            background-color: #162F22;
+            color: #f0f0ee;
+            display: flex;
+            flex-direction: column;
+            padding: 28px 0 20px 0;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            flex-shrink: 0;
+            user-select: none;
+            box-shadow: 2px 0 16px rgba(0, 0, 0, 0.06);
+        }
+
+        .sidebar-logo {
+            padding: 0 28px 32px 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-logo .logo-icon {
+            width: 38px;
+            height: 38px;
+            background: rgba(255, 255, 255, 0.10);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #d4e6d0;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .sidebar-logo h1 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-size: 20px;
+            letter-spacing: 0.3px;
+            color: #f5f7f2;
+            line-height: 1.2;
+        }
+        .sidebar-logo h1 span {
+            font-weight: 400;
+            font-size: 13px;
+            font-family: 'DM Sans', sans-serif;
+            letter-spacing: 1.2px;
+            opacity: 0.5;
+            display: block;
+            margin-top: 1px;
+        }
+
+        /* menu */
+        .sidebar-nav {
+            flex: 1;
+            padding: 6px 16px 0 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            color: #cfdfd4;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            letter-spacing: 0.2px;
+        }
+
+        .sidebar-nav a i {
+            width: 22px;
+            font-size: 16px;
+            text-align: center;
+            color: #b5cab9;
+            transition: color 0.2s;
+        }
+
+        .sidebar-nav a:hover {
+            background: rgba(255, 255, 255, 0.07);
+            color: #f0f7ee;
+        }
+        .sidebar-nav a:hover i {
+            color: #e2f0dc;
+        }
+
+        .sidebar-nav a.active {
+            background: rgba(255, 255, 255, 0.12);
+            color: #ffffff;
+            font-weight: 600;
+        }
+        .sidebar-nav a.active i {
+            color: #ffffff;
+        }
+
+        /* logout at bottom */
+        .sidebar-logout {
+            padding: 10px 28px 0 28px;
+            margin-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .sidebar-logout a {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            color: #cfdfd4;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-logout a i {
+            width: 22px;
+            font-size: 16px;
+            text-align: center;
+            color: #b5cab9;
+        }
+
+        .sidebar-logout a:hover {
+            background: rgba(255, 255, 255, 0.07);
+            color: #f0f7ee;
+        }
+        .sidebar-logout a:hover i {
+            color: #e2f0dc;
+        }
+
+        /* ----- MAIN CONTENT (cream) ----- */
+        .main-content {
+            flex: 1;
+            padding: 32px 40px 40px 40px;
+            overflow-y: auto;
+            height: 100vh;
+            background-color: #F4EFE6;
+        }
+
+        /* header row */
+        .main-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .main-header .page-title {
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-size: 28px;
+            color: #1c2e1f;
+            letter-spacing: -0.3px;
+        }
+        .main-header .page-title small {
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 400;
+            font-size: 16px;
+            color: #6f7a6a;
+            margin-left: 10px;
+            letter-spacing: 0.2px;
+        }
+
+        .greeting-area {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .greeting-area .greeting-text {
+            text-align: right;
+            font-size: 15px;
+            line-height: 1.4;
+        }
+        .greeting-area .greeting-text .name {
+            font-weight: 700;
+            color: #1c2e1f;
+            font-size: 16px;
+        }
+        .greeting-area .greeting-text .role {
+            font-size: 13px;
+            color: #7b8a76;
+            font-weight: 400;
+        }
+
+        .avatar-circle {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: #dce5d3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1c2e1f;
+            font-weight: 600;
+            font-size: 18px;
+            border: 2px solid #c5d3ba;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        /* ----- KPI CARDS ----- */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .kpi-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 22px 24px 20px 24px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(0, 0, 0, 0.02);
+            transition: box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: #162F22;
+            opacity: 0.15;
+        }
+
+        .kpi-card .kpi-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #6a7a63;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .kpi-card .kpi-value {
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 700;
+            font-size: 30px;
+            color: #1c2e1f;
+            margin: 10px 0 6px 0;
+            letter-spacing: -0.5px;
+        }
+
+        .kpi-card .kpi-trend {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #3f6b4a;
+            background: rgba(22, 47, 34, 0.06);
+            padding: 2px 12px 2px 8px;
+            border-radius: 30px;
+        }
+
+        .kpi-card .kpi-trend i {
+            font-size: 12px;
+        }
+
+        .kpi-card .faded-accent {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 70px;
+            height: 70px;
+            background: #162F22;
+            opacity: 0.03;
+            border-radius: 50%;
+        }
+
+        /* ----- TWO COLUMN LAYOUT (chart + top products) ----- */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 28px;
+            margin-bottom: 34px;
+        }
+
+        .chart-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 22px 24px 18px 24px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(0, 0, 0, 0.02);
+        }
+
+        .chart-card .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .chart-card .card-header h3 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-size: 20px;
+            color: #1c2e1f;
+        }
+
+        .chart-card .card-header .legend-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2a5e3a;
+            margin-right: 6px;
+        }
+
+        .chart-container {
+            height: 200px;
+            position: relative;
+        }
+
+        /* top products */
+        .products-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 22px 24px 18px 24px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(0, 0, 0, 0.02);
+        }
+
+        .products-card .card-header h3 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-size: 20px;
+            color: #1c2e1f;
+            margin-bottom: 14px;
+        }
+
+        .product-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .product-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0ebe2;
+        }
+
+        .product-list li:last-child {
+            border-bottom: none;
+        }
+
+        .product-list .product-name {
+            font-family: 'Playfair Display', serif;
+            font-weight: 500;
+            font-size: 16px;
+            color: #1e2e1c;
+        }
+
+        .product-list .product-qty {
+            font-weight: 700;
+            font-size: 16px;
+            color: #1f4a2a;
+            background: rgba(22, 47, 34, 0.05);
+            padding: 2px 14px;
+            border-radius: 30px;
+        }
+
+        /* ----- RECENT ORDERS TABLE ----- */
+        .table-section {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 22px 24px 10px 24px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(0, 0, 0, 0.02);
+        }
+
+        .table-section .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .table-section .card-header h3 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-size: 20px;
+            color: #1c2e1f;
+        }
+
+        .table-section .card-header .view-all {
+            font-size: 14px;
+            color: #4a6a4f;
+            font-weight: 500;
+            text-decoration: none;
+            border-bottom: 1px dashed #b7cbb0;
+        }
+
+        .orders-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .orders-table th {
+            text-align: left;
+            padding: 12px 8px 12px 0;
+            font-weight: 600;
+            color: #52674c;
+            border-bottom: 1px solid #ece6dc;
+            font-size: 13px;
+            letter-spacing: 0.3px;
+        }
+
+        .orders-table td {
+            padding: 12px 8px 12px 0;
+            border-bottom: 1px solid #f1ebe2;
+            color: #1f2e1c;
+        }
+
+        .orders-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .orders-table tbody tr {
+            background-color: #ffffff;
+            transition: background 0.15s;
+        }
+
+        .orders-table tbody tr:nth-child(even) {
+            background-color: #faf8f4;
+        }
+
+        .orders-table tbody tr:hover {
+            background-color: #f4f0e8;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            background: #eef4ea;
+            color: #2f5a3a;
+        }
+
+        .status-badge.delivered {
+            background: #e2f0e0;
+            color: #1d6b2e;
+        }
+
+        .status-badge.confirmed {
+            background: #dde9f5;
+            color: #1c5a7a;
+        }
+
+        .status-badge.draft {
+            background: #eae7e1;
+            color: #6b6b5e;
+        }
+
+        .orders-table .total-col {
+            font-weight: 600;
+            color: #1c2e1f;
+        }
+
+        .orders-table .date-col {
+            color: #5c6e56;
+            font-size: 13px;
+        }
+
+        /* ----- RESPONSIVE ----- */
+        @media (max-width: 1100px) {
+            .two-col {
+                grid-template-columns: 1fr;
+            }
+            .kpi-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
+                min-width: 70px;
+                padding: 16px 0;
+            }
+            .sidebar-logo {
+                padding: 0 10px 20px 10px;
+                justify-content: center;
+            }
+            .sidebar-logo h1 {
+                display: none;
+            }
+            .sidebar-logo .logo-icon {
+                width: 42px;
+                height: 42px;
+                font-size: 20px;
+            }
+            .sidebar-nav a {
+                padding: 12px 0;
+                justify-content: center;
+                font-size: 0;
+            }
+            .sidebar-nav a i {
+                font-size: 20px;
+                width: auto;
+            }
+            .sidebar-nav a span {
+                display: none;
+            }
+            .sidebar-logout a {
+                justify-content: center;
+                font-size: 0;
+                padding: 12px 0;
+            }
+            .sidebar-logout a i {
+                font-size: 20px;
+                width: auto;
+            }
+            .sidebar-logout a span {
+                display: none;
+            }
+            .main-content {
+                padding: 20px 16px;
+            }
+            .main-header .page-title {
+                font-size: 22px;
+            }
+            .kpi-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .greeting-area .greeting-text .role {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+            .main-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .greeting-area {
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
+
+        /* extra polish */
+        .text-muted {
+            color: #7b8a76;
+        }
+        .fw-500 {
+            font-weight: 500;
+        }
+
+        /* smooth loading */
+        .chart-container canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ========== SIDEBAR ========== -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div class="logo-icon">
+                <i class="fas fa-leaf"></i>
+            </div>
+            <h1>Herba<span>B2B</span></h1>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#" class="active"><i class="fas fa-chart-simple"></i><span>Dashboard</span></a>
+            <a href="#"><i class="fas fa-leaf"></i><span>Products</span></a>
+            <a href="#"><i class="fas fa-box"></i><span>Orders</span></a>
+            <a href="#"><i class="fas fa-users"></i><span>Customers</span></a>
+            <a href="#"><i class="fas fa-user"></i><span>Users</span></a>
+            <a href="#"><i class="fas fa-scroll"></i><span>Audit Logs</span></a>
+            <a href="#"><i class="fas fa-gear"></i><span>Settings</span></a>
+        </nav>
+
+        <div class="sidebar-logout">
+            <a href="#"><i class="fas fa-right-from-bracket"></i><span>Logout</span></a>
+        </div>
+    </aside>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="main-content">
+
+        <!-- header -->
+        <header class="main-header">
+            <div class="page-title">
+                Dashboard <small>B2B · Herbal Supply</small>
+            </div>
+            <div class="greeting-area">
+                <div class="greeting-text">
+                    <div class="name">Welcome, Super Admin</div>
+                    <div class="role">Herba B2B Platform</div>
+                </div>
+                <div class="avatar-circle">
+                    <span>SA</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- KPI Cards -->
+        <section class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">
+                    Revenue (MTD)
+                    <span class="kpi-trend"><i class="fas fa-arrow-up"></i> +8.2%</span>
+                </div>
+                <div class="kpi-value">₹12,45,000</div>
+                <div class="faded-accent"></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">
+                    Orders (MTD)
+                    <span class="kpi-trend"><i class="fas fa-arrow-up"></i> +12%</span>
+                </div>
+                <div class="kpi-value">34</div>
+                <div class="faded-accent"></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">
+                    Total Customers
+                    <span class="kpi-trend"><i class="fas fa-arrow-up"></i> +4%</span>
+                </div>
+                <div class="kpi-value">89</div>
+                <div class="faded-accent"></div>
+            </div>
+        </section>
+
+        <!-- Two-column: Chart + Top Products -->
+        <section class="two-col">
+
+            <!-- Line Chart -->
+            <div class="chart-card">
+                <div class="card-header">
+                    <h3>Revenue Last 12 Months</h3>
+                    <span style="font-size:13px; color:#5f7059;"><span class="legend-dot"></span> Monthly revenue</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Products -->
+            <div class="products-card">
+                <div class="card-header">
+                    <h3>Top Products</h3>
+                </div>
+                <ul class="product-list">
+                    <li><span class="product-name">Dry Ginger</span><span class="product-qty">1200 kg</span></li>
+                    <li><span class="product-name">Moringa</span><span class="product-qty">980 kg</span></li>
+                    <li><span class="product-name">Ashwagandha</span><span class="product-qty">750 kg</span></li>
+                    <li><span class="product-name">Mucuna</span><span class="product-qty">620 kg</span></li>
+                    <li><span class="product-name">Turmeric</span><span class="product-qty">500 kg</span></li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Recent Orders Table -->
+        <section class="table-section">
+            <div class="card-header">
+                <h3>Recent Orders</h3>
+                <a href="#" class="view-all">View all →</a>
+            </div>
+            <table class="orders-table">
+                <thead>
+                    <tr>
+                        <th>Customer</th>
+                        <th>Status</th>
+                        <th>Total</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Patanjali Herbals</td>
+                        <td><span class="status-badge delivered">Delivered</span></td>
+                        <td class="total-col">₹84,500</td>
+                        <td class="date-col">12 May 2026</td>
+                    </tr>
+                    <tr>
+                        <td>AyurVeda Trading Co.</td>
+                        <td><span class="status-badge confirmed">Confirmed</span></td>
+                        <td class="total-col">₹1,22,300</td>
+                        <td class="date-col">11 May 2026</td>
+                    </tr>
+                    <tr>
+                        <td>Green Roots Exports</td>
+                        <td><span class="status-badge delivered">Delivered</span></td>
+                        <td class="total-col">₹46,200</td>
+                        <td class="date-col">10 May 2026</td>
+                    </tr>
+                    <tr>
+                        <td>Himalayan Spice Supply</td>
+                        <td><span class="status-badge draft">Draft</span></td>
+                        <td class="total-col">₹9,800</td>
+                        <td class="date-col">09 May 2026</td>
+                    </tr>
+                    <tr>
+                        <td>Bharat Botanicals</td>
+                        <td><span class="status-badge confirmed">Confirmed</span></td>
+                        <td class="total-col">₹2,15,400</td>
+                        <td class="date-col">08 May 2026</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+
+    <!-- ========== CHART INIT ========== -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const revenueData = [420, 480, 390, 540, 620, 710, 680, 780, 850, 920, 980, 1245];
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'Revenue (₹ thousands)',
+                        data: revenueData,
+                        borderColor: '#1f4a2a',
+                        backgroundColor: 'rgba(31, 74, 42, 0.05)',
+                        borderWidth: 2.5,
+                        pointBackgroundColor: '#1f4a2a',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.28,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false,
+                        },
+                        tooltip: {
+                            backgroundColor: '#1c2e1f',
+                            titleColor: '#f4efe6',
+                            bodyColor: '#f4efe6',
+                            cornerRadius: 8,
+                            padding: 10,
+                            callbacks: {
+                                label: function(context) {
+                                    return '₹' + context.parsed.y + 'K';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(0,0,0,0.04)',
+                                drawBorder: false,
+                            },
+                            ticks: {
+                                font: { size: 11, family: 'DM Sans' },
+                                color: '#6f7a6a',
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)',
+                                drawBorder: false,
+                            },
+                            ticks: {
+                                font: { size: 11, family: 'DM Sans' },
+                                color: '#6f7a6a',
+                                callback: function(value) {
+                                    return '₹' + value + 'K';
+                                }
+                            },
+                            beginAtZero: true,
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
+                    elements: {
+                        line: {
+                            borderJoinStyle: 'round',
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
