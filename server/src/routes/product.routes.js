@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const productController = require('../controllers/product.controller');
-const { authenticate, authorize } = require('../middlewares/auth1');
+const { authenticate, authorize } = require('../middlewares/auth');
 const upload = require('../middlewares/upload');
 
 // Public routes

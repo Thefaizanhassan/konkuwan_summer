@@ -13,7 +13,11 @@ export default function WarRoom() {
     onSuccess: (data) => setBrief(data.brief_json),
   });
 
-  const { data: pastBriefs } = useQuery(['warroom-briefs'], () => apiClient.get('/admin/farm/warroom-briefs').then(r => r.data.data));
+//  const { data: pastBriefs } = useQuery(['warroom-briefs'], () => apiClient.get('/admin/farm/warroom-briefs').then(r => r.data.data));
+  const { data: pastBriefs } = useQuery({
+    queryKey: ['warroom-briefs'],
+    queryFn: () => apiClient.get('/admin/farm/warroom-briefs').then(r => r.data.data),
+  });
 
   return (
     <div className="space-y-6">

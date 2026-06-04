@@ -5,7 +5,7 @@ const userAdminController = require('../controllers/user.admin.controller');
 const {
   authenticate,
   authorize,
-} = require('../middlewares/auth1');
+} = require('../middlewares/auth');
 
 router.use(authenticate);
 router.use(authorize('super_admin'));
@@ -30,7 +30,7 @@ module.exports = router;
 
 // const router = require('express').Router();
 // const adminController = require('../controllers/admin.controller');
-// const { authenticate, authorize } = require('../middlewares/auth1');
+// const { authenticate, authorize } = require('../middlewares/auth');
 
 // router.use(authenticate);
 // router.use(authorize('super_admin')); // only super admin can manage users

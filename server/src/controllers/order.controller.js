@@ -9,6 +9,7 @@ const {
   User,
   sequelize,
 } = require('../models');
+const auditLog = require('../utils/audit');
 const {
   createOrderSchema,
   updateOrderSchema,
@@ -172,6 +173,8 @@ exports.updateOrderStatus = async (req, res, next) => {
   try {
     const order = await Order.findByPk(req.params.id);
     if (!order) return next(new AppError('Order not found.', 404));
+
+    const previousStatus = order.status;
 
     const { error, value } = updateOrderSchema.validate(req.body);
     if (error) return next(new AppError(error.details[0].message, 400));

@@ -35,11 +35,28 @@ exports.generatePOP = async (req, res, next) => {
   if (!crop || !crop.planting_date) return next(new AppError('Planting date not set.', 400));
 
   // Build prompt similar to original
-  const prompt = /* assemble system and user prompts using crop data */;
-  const text = await callClaude(prompt.system, prompt.user);
-  if (!text) return next(new AppError('Claude generation failed.', 500));
+//   const prompt = /* assemble system and user prompts using crop data */;
+//   const text = await callClaude(prompt.system, prompt.user);
+//   if (!text) return next(new AppError('Claude generation failed.', 500));
 
-  const pop = { week: /* calculated week */, text, date: new Date().toISOString() };
+//   const pop = { week: /* calculated week */, text, date: new Date().toISOString() };
+const weeksIn = crop.planting_date
+  ? Math.max(0, Math.floor((Date.now() - new Date(crop.planting_date)) / 604800000))
+  : 0;
+
+const systemPrompt = `You are an expert agronomist for Indian medicinal herb farming. 
+Give practical, week-specific field tasks for the crop at its current growth stage. 
+Be concise and actionable. Format as a numbered list.`;
+
+const userPrompt = `Crop: ${cropId}
+Weeks since planting: ${weeksIn}
+Generate specific field tasks for this week. Include: irrigation schedule, pest scouting, fertilisation if due, and any stage-specific actions.`;
+
+const text = await callClaude(systemPrompt, userPrompt);
+if (!text) return next(new AppError('Claude generation failed.', 500));
+
+const pop = { week: weeksIn, text, date: new Date().toISOString() };
+
   const { error } = await supabase.from('crop_setups').update({ pop_json: pop }).eq('crop_id', cropId);
   if (error) return next(new AppError(error.message, 500));
   res.json({ success: true, data: pop });
@@ -131,7 +148,31 @@ exports.generateBrief = async (req, res, next) => {
   ]);
 
   // Build prompts and call Claude (similar to original logic)
-  const briefText = await callClaude('...', '...'); // assemble data
+  const cashAmount = cash?.[0]?.amount || 0;
+const totalExpenses = expenses?.reduce((s, e) => e.type === 'expense' ? s + parseFloat(e.amount) : s, 0) || 0;
+const totalRevenue = expenses?.reduce((s, e) => e.type === 'revenue' ? s + parseFloat(e.amount) : s, 0) || 0;
+
+const systemPrompt = `You are a farm operations advisor. Analyse the data and produce a Monday War Room brief as valid JSON only — no markdown, no explanation.
+Return exactly this structure:
+{
+  "overallStatus": "GREEN" | "AMBER" | "RED",
+  "headline": "one sentence summary",
+  "crops": [{"name": string, "week": number, "status": "GREEN"|"AMBER"|"RED", "note": string}],
+  "actions": [{"priority": number, "action": string, "owner": string, "by": string}],
+  "risks": [{"level": "HIGH"|"MEDIUM", "risk": string, "fix": string}],
+  "founderDecision": string | null
+}`;
+
+const userPrompt = `Week reference: ${week_ref}
+Crops: ${JSON.stringify(crops?.map(c => ({ id: c.crop_id, planting_date: c.planting_date })))}
+Farmers enrolled: ${farmers?.length || 0}
+Cash on hand: ₹${cashAmount}
+Monthly expenses: ₹${totalExpenses}
+Monthly revenue: ₹${totalRevenue}
+Generate the War Room brief.`;
+
+const briefText = await callClaude(systemPrompt, userPrompt);
+//   const briefText = await callClaude('...', '...'); // assemble data
   let briefJson;
   try {
     briefJson = JSON.parse(briefText.replace(/```json|```/g, ''));

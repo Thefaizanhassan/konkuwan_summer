@@ -63,10 +63,19 @@ export default function UserManagement() {
             if (editingUser) {
               updateMutation.mutate({ id: editingUser.id, ...formData });
             } else {
+                apiClient
+                    .post('/admin/users/invite', { email: formData.email, role: formData.role })
+                    .then(() => {
+                        queryClient.invalidateQueries(['admin-users']);
+                        setModalOpen(false);
+                    })
+                    .catch(err => {
+                        alert(err.response?.data?.message || 'Failed to send invitation');
+                    });
               // invite logic
-              apiClient.post('/admin/users/invite', { email: formData.email, role: formData.role })
-                .then(() => queryClient.invalidateQueries(['admin-users']))
-                .finally(() => setModalOpen(false));
+            //   apiClient.post('/admin/users/invite', { email: formData.email, role: formData.role })
+            //     .then(() => queryClient.invalidateQueries(['admin-users']))
+            //     .finally(() => setModalOpen(false));
             }
           }}
         />

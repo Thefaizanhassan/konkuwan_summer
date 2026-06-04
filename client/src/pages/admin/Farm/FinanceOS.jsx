@@ -21,8 +21,16 @@ export default function FinanceOS() {
   const [revForm, setRevForm] = useState({ date: new Date().toISOString().slice(0,10), amount: '', note: '' });
   const [cashVal, setCashVal] = useState('');
 
-  const { data: expenses } = useQuery(['farm-expenses'], () => apiClient.get('/admin/farm/expenses').then(r => r.data.data));
-  const { data: cash } = useQuery(['farm-cash'], () => apiClient.get('/admin/farm/cash').then(r => r.data.data));
+//  const { data: expenses } = useQuery(['farm-expenses'], () => apiClient.get('/admin/farm/expenses').then(r => r.data.data));
+//  const { data: cash } = useQuery(['farm-cash'], () => apiClient.get('/admin/farm/cash').then(r => r.data.data));
+  const { data: expenses } = useQuery({
+   queryKey: ['farm-expenses'],
+   queryFn: () => apiClient.get('/admin/farm/expenses').then(r => r.data.data),
+  });
+  const { data: cash } = useQuery({
+   queryKey: ['farm-cash'],
+   queryFn: () => apiClient.get('/admin/farm/cash').then(r => r.data.data),
+  });
 
   const addExpense = useMutation({
     mutationFn: (data) => apiClient.post('/admin/farm/expenses', { ...data, type: 'expense' }),

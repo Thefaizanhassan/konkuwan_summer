@@ -24,9 +24,15 @@ export default function CropOS() {
   });
 
   // Fetch crop setups
-  const { data: setups } = useQuery(['farm-crops'], () => apiClient.get('/admin/farm/crops').then(r => r.data.data));
+    const { data: setups } = useQuery({
+        queryKey: ['farm-crops'],
+        queryFn: () => apiClient.get('/admin/farm/crops').then(r => r.data.data),
+    });
   // Fetch observations for active crop
-  const { data: observations } = useQuery(['farm-obs', activeCrop], () => apiClient.get(`/admin/farm/crops/${activeCrop}/observations`).then(r => r.data.data));
+    const { data: observations } = useQuery({
+        queryKey: ['farm-obs', activeCrop],
+        queryFn: () => apiClient.get(`/admin/farm/crops/${activeCrop}/observations`).then(r => r.data.data),
+    });
 
   const setup = setups?.find(s => s.crop_id === activeCrop);
   const weeks = weeksFrom(setup?.planting_date);

@@ -4,6 +4,7 @@ import apiClient from '../../services/api';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
+import Pagination from '../../components/ui/Pagination';
 
 export default function ProductManagement() {
   const queryClient = useQueryClient();

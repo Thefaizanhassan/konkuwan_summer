@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Product, Category, ProductImage, ProductCategory, sequelize } = require('../models');
+const { Product, Category, ProductImage, ProductCategory, PricingHistory, sequelize } = require('../models');
 const { createProductSchema, updateProductSchema } = require('../validations/product.validation');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');

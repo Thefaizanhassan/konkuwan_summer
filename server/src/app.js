@@ -17,7 +17,7 @@ const categoryPublicRoutes = require('./routes/category.public.routes');
 const categoryAdminRoutes = require('./routes/category.admin.routes');
 
 const analyticsAdminRoutes = require('./routes/analytics.admin.routes');
-
+const farmAdminRoutes = require('./routes/farm.admin.routes');
 
 
 const cookieParser = require('cookie-parser');
@@ -87,6 +87,7 @@ app.use('/api/admin/audit-logs', auditAdminRoutes);
 app.use('/api/admin/settings', settingsAdminRoutes);
 
 app.use('/api/admin/analytics', analyticsAdminRoutes);
+app.use('/api/admin/farm', farmAdminRoutes);
 
 app.use('/api/admin/customers', customerAdminRoutes);
 app.use('/api/admin/orders', orderAdminRoutes);

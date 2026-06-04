@@ -7,7 +7,7 @@ import useProducts from '../hooks/useProducts';
 import useScrollReveal from '../hooks/useScrollReveal';
 // import heroBg from '../../assets/hero-bg.jpg'; // or use a static image
 // import heroBg from '../../assets/hero.png'; // or use a static image
-import heroBg from '../../src/assets/hero.png'
+import heroBg from '../assets/hero-bg.jpg'
 
 export default function Home() {
   useScrollReveal();

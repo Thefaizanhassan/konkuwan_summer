@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const analyticsController = require('../controllers/analytics.controller');
-const { authenticate, authorize } = require('../middlewares/auth1');
+const { authenticate, authorize } = require('../middlewares/auth');
 
 // All analytics routes are protected and accessible to admins and viewers
 router.use(authenticate);

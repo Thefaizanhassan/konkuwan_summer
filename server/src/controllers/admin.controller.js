@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+const { Op } = require('sequelize');
 const { User, Role } = require('../models');
 const { hashPassword } = require('../services/auth.service');
 const AppError = require('../utils/AppError');

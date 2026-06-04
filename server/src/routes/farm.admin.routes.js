@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const farmController = require('../controllers/farm.controller');
-const { authenticate, authorize } = require('../middlewares/auth1');
+const { authenticate, authorize } = require('../middlewares/auth');
 
 router.use(authenticate);
 router.use(authorize('super_admin', 'farm_manager'));

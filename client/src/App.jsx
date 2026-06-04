@@ -26,6 +26,7 @@ import CustomerManagement from './pages/admin/CustomerManagement';
 import UserManagement from './pages/admin/UserManagement';
 import AuditLogs from './pages/admin/AuditLogs';
 import Settings from './pages/admin/Settings';
+import FarmDashboard from './pages/admin/Farm/index';
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ export default function App() {
                 <Route path="users" element={<UserManagement />} />
                 <Route path="audit-logs" element={<AuditLogs />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="farm/*" element={<FarmDashboard />} />
               </Route>
             </Route>
           </Routes>
