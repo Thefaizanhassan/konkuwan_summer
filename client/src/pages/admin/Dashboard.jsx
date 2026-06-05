@@ -1,4 +1,251 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import apiClient from '../../services/api';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer
+} from 'recharts';
+
+const STATUS_COLORS = {
+  delivered:  { bg: '#e2f0e0', color: '#1d6b2e' },
+  confirmed:  { bg: '#dde9f5', color: '#1c5a7a' },
+  dispatched: { bg: '#fef3c7', color: '#92400e' },
+  draft:      { bg: '#eae7e1', color: '#6b6b5e' },
+  cancelled:  { bg: '#fee2e2', color: '#991b1b' },
+};
+
+function StatusBadge({ status }) {
+  const s = STATUS_COLORS[status] || STATUS_COLORS.draft;
+  return (
+    <span
+      className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold capitalize"
+      style={{ background: s.bg, color: s.color }}
+    >
+      {status}
+    </span>
+  );
+}
+
+function KPICard({ label, value, trend, trendUp }) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl p-6"
+      style={{
+        background: '#fff',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+        border: '1px solid rgba(0,0,0,0.02)',
+      }}
+    >
+      {/* bottom bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-[3px]" style={{ background: '#162F22', opacity: 0.15 }} />
+      {/* faded circle */}
+      <div className="absolute -top-2 -right-2 w-16 h-16 rounded-full" style={{ background: '#162F22', opacity: 0.03 }} />
+
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-sm font-medium" style={{ color: '#6a7a63' }}>{label}</span>
+        {trend && (
+          <span
+            className="flex items-center gap-1 text-xs font-semibold px-3 py-0.5 rounded-full"
+            style={{ background: 'rgba(22,47,34,0.06)', color: '#3f6b4a' }}
+          >
+            {trendUp ? '↑' : '↓'} {trend}
+          </span>
+        )}
+      </div>
+      <div className="text-3xl font-bold tracking-tight" style={{ color: '#1c2e1f', fontFamily: "'DM Sans',sans-serif" }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const { user } = useAuth();
+  const { data, isLoading } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: () => apiClient.get('/admin/analytics/dashboard').then(r => r.data),
+    staleTime: 60_000,
+  });
+
+  const kpi = data?.data?.kpi || {};
+  const recentOrders = data?.data?.recent_orders || [];
+  const topProducts = data?.data?.top_products || [];
+  const revenueChart = (data?.data?.revenue_chart || []).map(d => ({
+    month: new Date(d.month).toLocaleString('default', { month: 'short' }),
+    revenue: Math.round(Number(d.revenue) / 1000),
+  }));
+
+  const name = user?.profile?.name || user?.email?.split('@')[0] || 'Admin';
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-forest border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="font-display text-3xl" style={{ color: '#1c2e1f' }}>
+            Dashboard <small className="font-body text-base font-normal ml-2" style={{ color: '#7b8a76' }}>B2B · Herbal Supply</small>
+          </h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-semibold" style={{ color: '#1c2e1f' }}>Welcome, {name}</p>
+            <p className="text-xs capitalize" style={{ color: '#7b8a76' }}>
+              {user?.profile?.role?.replace(/_/g, ' ') || 'Admin'}
+            </p>
+          </div>
+          <div
+            className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0"
+            style={{ background: '#dce5d3', color: '#1c2e1f', border: '2px solid #c5d3ba' }}
+          >
+            {initials}
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <KPICard
+          label="Revenue (MTD)"
+          value={`₹${Number(kpi.revenue_mtd || 0).toLocaleString('en-IN')}`}
+          trend="+8.2%" trendUp
+        />
+        <KPICard
+          label="Orders (MTD)"
+          value={kpi.orders_mtd ?? 0}
+          trend="+12%" trendUp
+        />
+        <KPICard
+          label="Total Customers"
+          value={kpi.total_customers ?? 0}
+          trend="+4%" trendUp
+        />
+      </div>
+
+      {/* Chart + Top Products */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-7 mb-8">
+        {/* Chart */}
+        <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>Revenue Last 12 Months</h3>
+            <div className="flex items-center gap-2 text-xs" style={{ color: '#5f7059' }}>
+              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#2a5e3a' }} />
+              Monthly revenue
+            </div>
+          </div>
+          <div style={{ height: 220 }}>
+            {revenueChart.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={revenueChart} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v}K`} />
+                  <Tooltip
+                    contentStyle={{ background: '#1c2e1f', border: 'none', borderRadius: 8, color: '#f4efe6', fontSize: 12 }}
+                    formatter={v => [`₹${v}K`, 'Revenue']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#1f4a2a"
+                    strokeWidth={2.5}
+                    dot={{ fill: '#1f4a2a', strokeWidth: 2, stroke: '#fff', r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-sm text-muted">No revenue data yet</div>
+            )}
+          </div>
+        </div>
+
+        {/* Top Products */}
+        <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
+          <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>Top Products</h3>
+          {topProducts.length === 0 ? (
+            <p className="text-sm text-muted text-center py-8">No sales data yet</p>
+          ) : (
+            <ul className="divide-y" style={{ borderColor: '#f0ebe2' }}>
+              {topProducts.map((p, i) => (
+                <li key={i} className="flex items-center justify-between py-2.5">
+                  <span className="font-display text-base" style={{ color: '#1e2e1c' }}>
+                    {p.Product?.name || p.product_name || '—'}
+                  </span>
+                  <span
+                    className="text-sm font-bold px-4 py-0.5 rounded-full"
+                    style={{ background: 'rgba(22,47,34,0.05)', color: '#1f4a2a' }}
+                  >
+                    {Number(p.total_quantity || 0).toFixed(0)} {p.Product?.unit || 'kg'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Orders */}
+      <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>Recent Orders</h3>
+          <Link to="/admin/orders" className="text-sm font-medium" style={{ color: '#4a6a4f', borderBottom: '1px dashed #b7cbb0' }}>
+            View all →
+          </Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #ece6dc' }}>
+                {['Customer', 'Status', 'Total', 'Date'].map(h => (
+                  <th key={h} className="text-left pb-3 font-semibold text-xs uppercase tracking-wide pr-4" style={{ color: '#52674c' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {recentOrders.length === 0 ? (
+                <tr><td colSpan={4} className="py-8 text-center text-sm text-muted">No orders yet</td></tr>
+              ) : recentOrders.map((order, i) => (
+                <tr key={order.id}
+                  className="transition-colors"
+                  style={{
+                    borderBottom: i < recentOrders.length - 1 ? '1px solid #f1ebe2' : 'none',
+                    background: i % 2 === 1 ? '#faf8f4' : '#fff',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f4f0e8'}
+                  onMouseLeave={e => e.currentTarget.style.background = i % 2 === 1 ? '#faf8f4' : '#fff'}
+                >
+                  <td className="py-3 pr-4 font-medium" style={{ color: '#1f2e1c' }}>
+                    {order.Customer?.company_name || '—'}
+                  </td>
+                  <td className="py-3 pr-4"><StatusBadge status={order.status} /></td>
+                  <td className="py-3 pr-4 font-semibold" style={{ color: '#1c2e1f' }}>
+                    ₹{Number(order.total_amount || 0).toLocaleString('en-IN')}
+                  </td>
+                  <td className="py-3 text-xs" style={{ color: '#5c6e56' }}>
+                    {new Date(order.order_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/*
+import { useQuery } from '@tanstack/react-query';
 import apiClient from '../../services/api';
 import KPICard from '../../components/admin/KPICard';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -71,3 +318,4 @@ export default function Dashboard() {
     </div>
   );
 }
+*/

@@ -20,7 +20,7 @@ export default {
         ink: '#0F1A13',
       },
       fontFamily: {
-        display: ['Cormorant Garamond', 'Georgia', 'serif'],
+        display: ['Playfair Display', 'Cormorant Garamond', 'Georgia', 'serif'],
         body: ['DM Sans', 'system-ui', 'sans-serif'],
       },
       fontSize: {

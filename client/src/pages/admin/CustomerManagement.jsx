@@ -97,6 +97,59 @@ export default function CustomerManagement() {
 }
 
 function CustomerFormModal({ customer, onClose, onSubmit, isLoading }) {
+  const [form, setForm] = useState(
+    customer || { company_name: '', contact_person: '', email: '', phone: '', address: '', gstin: '', notes: '' }
+  );
+
+  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleSubmit = e => { e.preventDefault(); onSubmit(form); };
+
+  const field = 'w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20';
+
+  return (
+    <Modal onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <h3 className="font-display text-xl text-forest">{customer ? 'Edit Customer' : 'New Customer'}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Company *</label>
+            <input name="company_name" value={form.company_name} onChange={handleChange} required className={field} />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Contact Person</label>
+            <input name="contact_person" value={form.contact_person} onChange={handleChange} className={field} />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Email</label>
+            <input name="email" type="email" value={form.email} onChange={handleChange} className={field} />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Phone</label>
+            <input name="phone" value={form.phone} onChange={handleChange} className={field} />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Address</label>
+            <textarea name="address" value={form.address} onChange={handleChange} className={field} rows={2} />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">GSTIN</label>
+            <input name="gstin" value={form.gstin} onChange={handleChange} className={field} />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Notes</label>
+            <textarea name="notes" value={form.notes} onChange={handleChange} className={field} rows={2} />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" secondary onClick={onClose}>Cancel</Button>
+          <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save'}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+/*
+function CustomerFormModal({ customer, onClose, onSubmit, isLoading }) {
   const [form, setForm] = useState(customer || { company_name: '', contact_person: '', email: '', phone: '', address: '', gstin: '', notes: '' });
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -106,14 +159,14 @@ function CustomerFormModal({ customer, onClose, onSubmit, isLoading }) {
     onSubmit(form);
   };
 
-  return (
-    <Modal onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <h3 className="text-xl font-display">{customer ? 'Edit Customer' : 'New Customer'}</h3>
+    return (
+        <Modal onClose={onClose}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <h3 className="font-display text-xl text-forest">{customer ? 'Edit Customer' : 'New Customer'}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs uppercase tracking-wide text-muted">Company *</label>
-            <input name="company_name" value={form.company_name} onChange={handleChange} required className="w-full border p-2 rounded-sm" />
+            <input name="company_name" value={form.company_name} onChange={handleChange} required className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20" />
           </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-muted">Contact Person</label>
@@ -148,3 +201,4 @@ function CustomerFormModal({ customer, onClose, onSubmit, isLoading }) {
     </Modal>
   );
 }
+*/

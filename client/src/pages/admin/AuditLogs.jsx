@@ -29,7 +29,7 @@ export default function AuditLogs() {
         <select
           value={filters.entity_type}
           onChange={e => { setFilters(f => ({ ...f, entity_type: e.target.value })); setPage(1); }}
-          className="border border-border rounded-sm px-3 py-2 text-sm"
+          className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
         >
           <option value="">All entities</option>
           {ENTITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -37,7 +37,8 @@ export default function AuditLogs() {
         <select
           value={filters.action}
           onChange={e => { setFilters(f => ({ ...f, action: e.target.value })); setPage(1); }}
-          className="border border-border rounded-sm px-3 py-2 text-sm"
+        //   className="border border-border rounded-sm px-3 py-2 text-sm" // may need to chnage back
+            className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
         >
           <option value="">All actions</option>
           {ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
@@ -47,7 +48,7 @@ export default function AuditLogs() {
       {isLoading ? (
         <p className="text-muted">Loading...</p>
       ) : (
-        <div className="bg-white border border-border rounded-sm overflow-x-auto">
+        <div className="overflow-x-auto rounded-2xl" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
           <table className="min-w-full text-sm">
             <thead className="bg-cream-dark text-xs uppercase text-muted">
               <tr>

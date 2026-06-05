@@ -117,6 +117,7 @@ export default function OrderManagement() {
             setPage(1);
           }}
           className="border border-border rounded-sm px-3 py-2 text-sm"
+          // className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
         >
           <option value="">All statuses</option>
 
@@ -137,7 +138,7 @@ export default function OrderManagement() {
             }));
             setPage(1);
           }}
-          className="border border-border rounded-sm px-3 py-2 text-sm"
+          className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
         />
 
         <input
@@ -150,7 +151,7 @@ export default function OrderManagement() {
             }));
             setPage(1);
           }}
-          className="border border-border rounded-sm px-3 py-2 text-sm"
+          className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
         />
       </div>
 
