@@ -6,8 +6,10 @@ export default function About() {
 
   return (
     <>
-      <section className="pt-28 pb-12 bg-cream border-b border-border">
-        <div className="max-w-6xl mx-auto px-6">
+      {/* <section className="pt-28 pb-12 bg-cream border-b border-border"> */}
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+      <section className="pt-[152px] pb-20 bg-cream border-b border-border">
+        <div className="container-kk">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">About Us</span>
             <h1 className="font-display text-5xl md:text-6xl text-forest mt-4">We started in a village called Konkuwa.</h1>
@@ -16,8 +18,10 @@ export default function About() {
         </div>
       </section>
 
-      <section className="py-16 bg-forest text-white/80 relative overflow-hidden">
-        <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+      {/* <section className="py-16 bg-forest text-white/80 relative overflow-hidden">
+        <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center"> */}
+      <section className="section-kk bg-forest text-white/80 relative overflow-hidden">
+        <div className="container-kk grid md:grid-cols-2 gap-20 items-center">
           <ScrollReveal>
             <h2 className="font-display text-3xl text-white">From a tribal village to a national supply chain.</h2>
             <p className="mt-6 leading-relaxed">In 2018, Roopali and Rajeshwar began working with farming communities in tribal Jharkhand. The name <strong>Konkuwan</strong> comes from that first village — a reminder of why this work exists.</p>
@@ -32,8 +36,10 @@ export default function About() {
         </div>
       </section>
 
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-6">
+      {/* <section className="py-16">
+        <div className="max-w-6xl mx-auto px-6"> */}
+      <section className="section-kk">
+        <div className="container-kk">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">The Team</span>
             <h2 className="font-display text-3xl text-forest mt-2">Founders.</h2>
@@ -46,6 +52,47 @@ export default function About() {
       </section>
 
       {/* Advisors and Company Facts similar to original */}
+      <section className="section-kk bg-cream">
+        <div className="container-kk">
+          <ScrollReveal>
+            <span className="text-xs uppercase tracking-widest text-sage">Advisors</span>
+            <h2 className="font-display text-3xl text-forest mt-2">Advisors.</h2>
+          </ScrollReveal>
+          <div className="grid grid-cols-1 md:grid-cols-2 border border-border mt-12">
+            {[
+              { name: 'Dr. Alka Dangash', desc: 'PhD Plant Botany · 25+ years of medicinal-and-aromatic-plant (MAP) research.' },
+              { name: 'Dr. Haldhar Mahato', desc: 'State Convenor PHRN · Public health & nutrition expert · former Member, Jharkhand State Food Commission.' },
+            ].map((a) => (
+              <div key={a.name} className="bg-white p-9 border-r border-border last:border-r-0 hover:bg-cream transition-colors">
+                <strong className="block text-lg text-forest font-semibold mb-2">{a.name}</strong>
+                <p className="text-sm text-muted">{a.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <ScrollReveal>
+            <span className="text-xs uppercase tracking-widest text-sage block mt-20">Company facts</span>
+            <h2 className="font-display text-3xl text-forest mt-2">The company on paper.</h2>
+          </ScrollReveal>
+          <dl className="border border-border mt-12">
+            {[
+              ['Incorporated', '2018'],
+              ['CIN', 'U01400OR2018PTC029698'],
+              ['DPIIT Reg. No.', 'DIPP59802'],
+              ['FSSAI', 'Registered'],
+              ['Registered Office', 'Baseli Sahi, Puri, Odisha'],
+              ['Branch Offices', 'Ranchi (Jharkhand) · Dehradun (Uttarakhand)'],
+            ].map(([term, value]) => (
+              <div key={term} className="grid grid-cols-1 md:grid-cols-[220px_1fr] border-b border-border last:border-b-0">
+                <dt className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted bg-cream border-b md:border-b-0 md:border-r border-border">
+                  {term}
+                </dt>
+                <dd className="px-6 py-4 text-[15px] text-forest">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
     </>
   );
 }

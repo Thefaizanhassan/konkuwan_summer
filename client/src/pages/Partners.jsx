@@ -24,7 +24,8 @@ export default function Partners() {
   return (
     <>
       <section className="pt-28 pb-12 bg-cream border-b border-border">
-        <div className="max-w-6xl mx-auto px-6">
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+        <div className="container-kk">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">Partners &amp; Investors</span>
             <h1 className="font-display text-5xl md:text-6xl text-forest mt-4">Who stands behind Konkuwan.</h1>
@@ -35,8 +36,10 @@ export default function Partners() {
         </div>
       </section>
 
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-6">
+      {/* <section className="py-16"> */}
+      <section className="section-kk">
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+        <div className="container-kk">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">Investors &amp; Capital</span>
             <h2 className="font-display text-3xl text-forest mt-2">Investors.</h2>
@@ -55,7 +58,8 @@ export default function Partners() {
         </div>
       </section>
 
-      <section className="py-16 bg-cream">
+      {/* <section className="py-16 bg-cream"> */}
+      <section className="section-kk bg-cream">
         <div className="max-w-6xl mx-auto px-6">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">Strategic Partners</span>

@@ -32,7 +32,8 @@ export default function Supply() {
   return (
     <>
       <section className="pt-28 pb-12 bg-cream border-b border-border">
-        <div className="max-w-6xl mx-auto px-6">
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+        <div className="container-kk">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">How We Supply</span>
             <h1 className="font-display text-5xl md:text-6xl text-forest mt-4">From farm to dispatch — here is our process.</h1>
@@ -41,7 +42,8 @@ export default function Supply() {
         </div>
       </section>
 
-      <section className="py-16">
+      {/* <section className="py-16"> */}
+      <section className="section-kk">
         <div className="max-w-4xl mx-auto px-6">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">The Process</span>
@@ -63,8 +65,10 @@ export default function Supply() {
         </div>
       </section>
 
-      <section className="py-16 bg-cream">
-        <div className="max-w-6xl mx-auto px-6">
+      {/* <section className="py-16 bg-cream"> */}
+      <section className="section-kk bg-cream">
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+        <div className="container-kk">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">Quality</span>
             <h2 className="font-display text-3xl text-forest mt-2">What we check before anything leaves.</h2>
@@ -82,7 +86,8 @@ export default function Supply() {
         </div>
       </section>
 
-      <section className="py-16">
+      {/* <section className="py-16"> */}
+      <section className="section-kk">
         <div className="max-w-3xl mx-auto px-6">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">Capacity</span>
@@ -115,7 +120,8 @@ export default function Supply() {
         </div>
       </section>
 
-      <section className="py-16 bg-forest text-center relative overflow-hidden">
+      {/* <section className="py-16 bg-forest text-center relative overflow-hidden"> */}
+      <section className="section-kk bg-forest text-center relative overflow-hidden">
         <div className="absolute top-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full bg-white/5"></div>
         <div className="relative z-10 max-w-xl mx-auto px-4">
           <h2 className="font-display text-4xl text-white">Ready to brief us?</h2>

@@ -20,7 +20,8 @@ export default function Products() {
   return (
     <>
       <section className="pt-28 pb-12 bg-cream border-b border-border">
-        <div className="max-w-6xl mx-auto px-6">
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+        <div className="container-kk">
           <ScrollReveal>
             <span className="eyebrow">Products</span>
             <h1 className="font-display text-4xl md:text-6xl text-forest">Our Products</h1>
@@ -32,7 +33,8 @@ export default function Products() {
       </section>
 
       <section className="py-12">
-        <div className="max-w-6xl mx-auto px-6">
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+        <div className="container-kk">
           {/* Filters */}
           <div className="flex flex-wrap gap-2 mb-8">
             <button

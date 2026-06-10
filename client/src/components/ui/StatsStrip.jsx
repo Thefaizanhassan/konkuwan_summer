@@ -3,7 +3,8 @@ import Counter from './Counter';
 export default function StatsStrip() {
   return (
     <div className="border-t border-b border-border bg-white">
-      <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4">
+      {/* <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4"> */}
+      <div className="container-kk grid grid-cols-2 md:grid-cols-4">
         {[
           { target: 2500, suffix: '+', label: 'Farming families engaged' },
           { target: 50, suffix: '+', label: 'Manufacturers and exporters served' },

@@ -31,7 +31,8 @@ export default function Contact() {
   return (
     <>
       <section className="pt-28 pb-12 bg-cream border-b border-border">
-        <div className="max-w-6xl mx-auto px-6">
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+        <div className="container-kk">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">Contact</span>
             <h1 className="font-display text-5xl text-forest mt-4">Let's talk.</h1>
@@ -41,7 +42,8 @@ export default function Contact() {
       </section>
 
       <section className="py-12">
-        <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-2 bg-border border border-border">
+        {/* <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-2 bg-border border border-border"> */}
+        <div className="container-kk grid md:grid-cols-2 gap-2 bg-border border border-border">
           {/* Buyer Form */}
           <div className="bg-white p-8">
             <span className="text-xs uppercase tracking-widest text-sage">For Buyers</span>

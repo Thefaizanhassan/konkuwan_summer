@@ -19,7 +19,14 @@ export default function Home() {
       {/* Hero */}
       <section className="relative min-h-screen flex items-center justify-center text-center overflow-hidden">
         <div className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-[10s]" style={{ backgroundImage: `url(${heroBg})` }}></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-[#05120A]/80 to-[#05120A]/85"></div>
+        {/* <div className="absolute inset-0 bg-gradient-to-b from-[#05120A]/80 to-[#05120A]/85"></div> */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(to bottom, rgba(5,18,10,0.72) 0%, rgba(5,18,10,0.45) 35%, rgba(5,18,10,0.60) 65%, rgba(5,18,10,0.85) 100%)',
+          }}
+        ></div>
         <div className="relative z-10 max-w-3xl px-4">
           <p className="text-xs uppercase tracking-[0.22em] text-white/90 mb-6 flex items-center justify-center gap-3 before:block before:w-7 before:h-px before:bg-white/50 after:block after:w-7 after:h-px after:bg-white/50">Medicinal plants · Spices · Superfoods</p>
           <h1 className="font-display italic text-5xl md:text-7xl text-white font-light leading-tight mb-6">
@@ -43,8 +50,10 @@ export default function Home() {
       <StatsStrip />
 
       {/* Why Konkuwan */}
-      <section className="py-24 bg-cream">
-        <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+      {/* <section className="py-24 bg-cream"> */}
+        {/* <div className="max-w-6xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center"> */}
+      <section className="section-kk bg-cream">
+        <div className="container-kk grid md:grid-cols-2 gap-20 items-center">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">Why Konkuwan</span>
             <h2 className="font-display text-4xl text-forest mt-4">Your raw material problem is real.</h2>
@@ -68,8 +77,10 @@ export default function Home() {
       </section>
 
       {/* Featured Products */}
-      <section className="py-24">
-        <div className="max-w-6xl mx-auto px-6">
+      {/* <section className="py-24"> */}
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+      <section className="section-kk">
+        <div className="container-kk">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">Featured Products</span>
             <h2 className="font-display text-4xl text-forest mt-4">What we supply.</h2>
@@ -86,12 +97,44 @@ export default function Home() {
       </section>
 
       {/* Recognition (similar grid from original) */}
-      <section className="py-24 bg-cream">
-        {/* ... */}
+      {/* <section className="py-24 bg-cream">
+      </section> */}
+
+/* ADD (paste in its place) */
+      <section className="section-kk bg-cream">
+        <div className="container-kk">
+          <ScrollReveal>
+            <div className="text-center max-w-xl mx-auto">
+              <span className="text-xs uppercase tracking-widest text-sage">Recognition</span>
+              <h2 className="font-display text-4xl text-forest mt-4">Recognised by institutions that matter.</h2>
+            </div>
+          </ScrollReveal>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 border border-border mt-12">
+            {[
+              { name: 'DPIIT', desc: 'Department for Promotion of Industry and Internal Trade · Recognised Startup DIPP59802' },
+              { name: 'WRI India', desc: 'Top 15 land-restoration companies in South Asia · Land Accelerator 2022' },
+              { name: 'Women on Wings', desc: "Dutch social enterprise · Strategic partner for women's economic empowerment" },
+              { name: 'IRMA iSeed', desc: 'Equity investor · Institute of Rural Management Anand seed fund' },
+              { name: 'IIMA Ventures', desc: 'Incubation and convertible debt · IIM Ahmedabad' },
+              { name: 'IIMCIP', desc: 'IIM Calcutta Innovation Park · 2024 cohort selection' },
+              { name: 'MANAGE-CIA / RKVY', desc: 'National Institute of Agricultural Extension Management · Incubation 2020' },
+              { name: 'Harit Bharat Fund', desc: 'WRI India + Sangam Ventures · Debt support for sustainable agriculture' },
+            ].map((item) => (
+              <div
+                key={item.name}
+                className="bg-white p-8 border-b border-r border-border hover:bg-cream transition-colors"
+              >
+                <div className="font-display text-lg font-semibold text-forest mb-2">{item.name}</div>
+                <div className="text-sm text-muted leading-snug">{item.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* CTA Banner */}
-      <section className="py-24 bg-forest text-center relative overflow-hidden">
+      {/* <section className="py-24 bg-forest text-center relative overflow-hidden"> */}
+      <section className="section-kk bg-forest text-center relative overflow-hidden">
         <div className="absolute top-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full bg-white/5"></div>
         <div className="absolute bottom-[-100px] left-[-60px] w-[440px] h-[440px] rounded-full bg-white/5"></div>
         <div className="relative z-10 max-w-xl mx-auto px-4">

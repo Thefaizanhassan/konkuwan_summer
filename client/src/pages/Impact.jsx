@@ -9,7 +9,8 @@ export default function Impact() {
   return (
     <>
       <section className="pt-28 pb-12 bg-cream border-b border-border">
-        <div className="max-w-6xl mx-auto px-6">
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+        <div className="container-kk">
           <ScrollReveal>
             <span className="text-xs uppercase tracking-widest text-sage">Impact</span>
             <h1 className="font-display text-5xl text-forest mt-4">What seven years in the field looks like.</h1>
@@ -19,7 +20,8 @@ export default function Impact() {
       </section>
 
       <section className="py-8 bg-forest">
-        <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 text-white text-center gap-4">
+        {/* <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 text-white text-center gap-4"> */}
+        <div className="container-kk grid grid-cols-2 md:grid-cols-4 text-white text-center gap-4">
           {[ { target: 2500, suffix: '+', label: 'Farming families' },
              { target: 7, label: 'States' },
              { target: 8, label: 'Medicinal crops' },
@@ -35,7 +37,8 @@ export default function Impact() {
       </section>
 
       <section className="py-16 bg-cream">
-        <div className="max-w-6xl mx-auto px-6">
+        {/* <div className="max-w-6xl mx-auto px-6"> */}
+        <div className="container-kk">
           <ScrollReveal>
             <h2 className="font-display text-3xl text-forest">Where we work.</h2>
           </ScrollReveal>

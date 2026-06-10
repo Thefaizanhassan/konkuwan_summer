@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@config "../tailwind.config.js";
 
 :root {
   --text: #6b6375;
@@ -17,9 +18,9 @@
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
+  font: 17px/1.75 var(--sans);
   letter-spacing: 0.18px;
-  color-scheme: light dark;
+  color-scheme: light;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -32,7 +33,7 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
+/* @media (prefers-color-scheme: dark) {
   :root {
     --text: #9ca3af;
     --text-h: #f3f4f6;
@@ -50,7 +51,7 @@
   #social .button-icon {
     filter: invert(1) brightness(2);
   }
-}
+} */
 
 /* Custom base styles */
 body {
@@ -78,6 +79,26 @@ body {
   color: theme('colors.sage');
 }
 
+
+#root {
+  min-height: 100vh;
+}
+
+/* Match original .container exactly */
+.container-kk {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 48px;
+}
+@media (max-width: 1024px) { .container-kk { padding: 0 28px; } }
+@media (max-width: 768px)  { .container-kk { padding: 0 20px; } }
+
+/* Match original section vertical rhythm */
+.section-kk { padding: 110px 0; }
+@media (max-width: 1024px) { .section-kk { padding: 88px 0; } }
+@media (max-width: 768px)  { .section-kk { padding: 64px 0; } }
+
 /* #root {
   width: 1126px;
   max-width: 100%;
@@ -90,9 +111,6 @@ body {
   box-sizing: border-box;
 } */
 
-#root {
-  min-height: 100vh;
-}
 
 /* h1,
 h2 {
