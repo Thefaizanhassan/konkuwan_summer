@@ -360,3 +360,15 @@ ALTER TABLE war_room_briefs ENABLE ROW LEVEL SECURITY;
 -- Allow authenticated users to select/insert/update/delete (simplified)
 CREATE POLICY "Allow all for authenticated users" ON crop_setups FOR ALL TO authenticated USING (true);
 -- Repeat for other tables...
+
+-- New profiles table
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  name VARCHAR(120),
+  email VARCHAR(255),
+  avatar_url VARCHAR(500),
+  is_active BOOLEAN DEFAULT true,
+  role VARCHAR(50) NOT NULL DEFAULT 'viewer', -- super_admin, product_manager, order_manager, farm_manager, viewer
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);

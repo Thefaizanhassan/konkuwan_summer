@@ -5,12 +5,26 @@ import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 
 const CROPS = [
-  { id: 'musli', name: 'Safed Musli', emoji: '🌿', acres: 4, color: '#7c3aed', light: '#ede9fe',
-    harvest: 'Nov-Dec 2026', revenue: 'Rs 20-40L',
+  { id: 'musli', name: 'Safed Musli', emoji: '🌿', acres: 4, color: '#162F22', light: '#EAF0EC',
+    harvest: 'Nov-Dec 2026', revenue: '₹20-40L',
     risks: ['White grub at root zone', 'Root rot from waterlogging', 'Poor tuber set if soil compacted'],
-    weeks: { 4: 'Stand count + gap fill', 8: '1st weeding + N side-dress', 12: 'Tuber dev check', 16: 'Stop irrigation - harden', 20: 'Harvest' },
+    weeks: { 4: 'Stand count + gap fill', 8: '1st weeding + N side-dress', 12: 'Tuber dev check', 16: 'Stop irrigation – harden', 20: 'Harvest' },
   },
-  // ... define all other crops exactly as original
+  { id: 'moringa', name: 'Moringa', emoji: '🌱', acres: 6, color: '#4A7860', light: '#EAF0EC',
+    harvest: 'Year-round (leaf)', revenue: '₹15-30L',
+    risks: ['Pod fly in pods', 'Leaf spot in high humidity', 'Waterlogging kills young plants'],
+    weeks: { 4: 'Thinning + first prune', 8: 'Pinch tips for branching', 12: 'First leaf harvest', 16: 'Side-dress + irrigate', 20: 'Sustained leaf cuttings' },
+  },
+  { id: 'mucuna', name: 'Mucuna', emoji: '🫛', acres: 3, color: '#B8844A', light: '#F4ECE0',
+    harvest: 'Feb-Mar 2027', revenue: '₹8-15L',
+    risks: ['Pod shattering if late-harvested', 'Aphids on young vines', 'Needs trellis support'],
+    weeks: { 4: 'Provide staking/trellis', 8: 'Weeding + vine training', 12: 'Flowering check', 16: 'Pod fill monitoring', 20: 'Harvest mature pods' },
+  },
+  { id: 'ginger', name: 'Ginger', emoji: '🫚', acres: 2, color: '#6A9E7A', light: '#EAF0EC',
+    harvest: 'Dec-Jan 2027', revenue: '₹6-12L',
+    risks: ['Rhizome rot in poor drainage', 'Shoot borer', 'Sunscald without mulch'],
+    weeks: { 4: 'Mulch + first weeding', 8: 'Earthing up', 12: 'Rhizome bulking check', 16: 'Second earthing up', 20: 'Maturity check before harvest' },
+  },
 ];
 
 function weeksFrom(d) { return !d ? 0 : Math.max(0, Math.floor((Date.now() - new Date(d)) / 604800000)); }
@@ -42,17 +56,20 @@ export default function CropOS() {
   // Mutations
   const saveSetup = useMutation({
     mutationFn: ({ cropId, data }) => apiClient.put(`/admin/farm/crops/${cropId}`, data),
-    onSuccess: () => queryClient.invalidateQueries(['farm-crops']),
+    // onSuccess: () => queryClient.invalidateQueries(['farm-crops']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
   });
 
   const genPOP = useMutation({
     mutationFn: (cropId) => apiClient.post(`/admin/farm/crops/${cropId}/pop`),
-    onSuccess: () => queryClient.invalidateQueries(['farm-crops']),
+    // onSuccess: () => queryClient.invalidateQueries(['farm-crops']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
   });
 
   const addObservation = useMutation({
     mutationFn: (data) => apiClient.post(`/admin/farm/crops/${activeCrop}/observations`, data),
-    onSuccess: () => queryClient.invalidateQueries(['farm-obs']),
+    // onSuccess: () => queryClient.invalidateQueries(['farm-obs']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
   });
 
   return (
@@ -73,7 +90,7 @@ export default function CropOS() {
 
       {/* Crop header */}
       {crop && (
-        <div className="rounded-xl p-5 text-white" style={{ backgroundColor: crop.color }}>
+        <div className="rounded p-5 text-white" style={{ backgroundColor: crop.color }}>
           <div className="flex justify-between items-start">
             <div>
               <span className="text-3xl">{crop.emoji}</span>
@@ -95,7 +112,7 @@ export default function CropOS() {
 
       {/* Planting date */}
       {!setup?.planting_date ? (
-        <div className="bg-white p-4 rounded-lg border">
+        <div className="bg-white p-5 rounded border border-border">
           <label className="block text-xs uppercase tracking-wider text-muted mb-2">Set Planting Date</label>
           <input type="date" onChange={(e) => saveSetup.mutate({ cropId: activeCrop, data: { planting_date: e.target.value } })}
             className="border rounded-sm p-2 w-full" />
@@ -108,11 +125,11 @@ export default function CropOS() {
       )}
 
       {/* POP */}
-      <div className="bg-white p-4 rounded-lg border">
+      <div className="bg-white p-5 rounded border border-border">
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-display text-lg">Week {weeks} Field Tasks</h3>
-          <Button onClick={() => genPOP.mutate(activeCrop)} disabled={genPOP.isLoading || !setup?.planting_date}>
-            {genPOP.isLoading ? 'Generating...' : 'Generate POP'}
+          <Button onClick={() => genPOP.mutate(activeCrop)} disabled={genPOP.isPending || !setup?.planting_date}>
+            {genPOP.isPending ? 'Generating...' : 'Generate POP'}
           </Button>
         </div>
         {setup?.pop_json ? (
@@ -121,7 +138,7 @@ export default function CropOS() {
       </div>
 
       {/* Observations */}
-      <div className="bg-white p-4 rounded-lg border">
+      <div className="bg-white p-5 rounded border border-border">
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-display text-lg">Weekly Observations</h3>
           <Button secondary onClick={() => setShowObsModal(true)}>+ Log Observation</Button>
@@ -131,7 +148,7 @@ export default function CropOS() {
             <div key={ob.id} className="border-b py-2 text-sm">
               <span className="text-muted">{ob.date} · Wk {ob.week}</span>
               <span className={`ml-2 px-2 py-0.5 rounded text-xs font-bold ${
-                ob.health === 'Excellent' || ob.health === 'Good' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                ob.health === 'Excellent' || ob.health === 'Good' ? 'bg-[#EAF4ED] text-[#2B6B42]' : 'bg-cream-dark text-earth'
               }`}>{ob.health}</span>
               {ob.pest !== 'No' && <span className="ml-2 text-red-600 text-xs">Pest: {ob.pest}</span>}
               {ob.note && <p className="mt-1">{ob.note}</p>}
@@ -179,7 +196,7 @@ export default function CropOS() {
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" secondary onClick={() => setShowObsModal(false)}>Cancel</Button>
-                <Button type="submit" disabled={addObservation.isLoading}>Save</Button>
+                <Button type="submit" disabled={addObservation.isPending}>Save</Button>
               </div>
             </form>
           </Modal>

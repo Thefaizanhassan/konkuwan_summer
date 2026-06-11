@@ -34,19 +34,23 @@ export default function FinanceOS() {
 
   const addExpense = useMutation({
     mutationFn: (data) => apiClient.post('/admin/farm/expenses', { ...data, type: 'expense' }),
-    onSuccess: () => queryClient.invalidateQueries(['farm-expenses']),
+    // onSuccess: () => queryClient.invalidateQueries(['farm-expenses']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-expenses'] }),
   });
   const addRevenue = useMutation({
     mutationFn: (data) => apiClient.post('/admin/farm/expenses', { ...data, type: 'revenue' }),
-    onSuccess: () => queryClient.invalidateQueries(['farm-expenses']),
+    // onSuccess: () => queryClient.invalidateQueries(['farm-expenses']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-expenses'] }),
   });
   const updateCash = useMutation({
     mutationFn: (amount) => apiClient.put('/admin/farm/cash', { amount }),
-    onSuccess: () => queryClient.invalidateQueries(['farm-cash']),
+    // onSuccess: () => queryClient.invalidateQueries(['farm-cash']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-cash'] }),
   });
   const deleteEntry = useMutation({
     mutationFn: (id) => apiClient.delete(`/admin/farm/expenses/${id}`),
-    onSuccess: () => queryClient.invalidateQueries(['farm-expenses']),
+    // onSuccess: () => queryClient.invalidateQueries(['farm-expenses']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-expenses'] }),
   });
 
   const thisMonth = new Date().toISOString().slice(0,7);
@@ -146,7 +150,8 @@ export default function FinanceOS() {
                 <p className="text-sm font-medium truncate">{e.description}</p>
                 <p className="text-xs text-muted">{e.date} · {e.logged_by_name}</p>
               </div>
-              <span className="font-mono font-bold">₹{e.amount.toLocaleString()}</span>
+              {/* <span className="font-mono font-bold">₹{e.amount.toLocaleString()}</span> */}
+              <span className="font-mono font-bold">₹{Number(e.amount).toLocaleString()}</span>
               <button onClick={() => deleteEntry.mutate(e.id)} className="text-red-500 text-lg">&times;</button>
             </div>
           );

@@ -25,8 +25,8 @@ export default function WarRoom() {
         <h3 className="font-display text-lg mb-3">Monday War Room Brief</h3>
         <Input placeholder="Week reference (e.g. Week 4 - May 2026)" value={weekRef} onChange={e => setWeekRef(e.target.value)} />
         <div className="mt-3">
-          <Button onClick={() => generateBrief.mutate()} disabled={generateBrief.isLoading} fullWidth>
-            {generateBrief.isLoading ? 'Generating...' : 'Generate Monday Brief'}
+          <Button onClick={() => generateBrief.mutate()} disabled={generateBrief.isPending} fullWidth>
+            {generateBrief.isPending ? 'Generating...' : 'Generate Monday Brief'}
           </Button>
         </div>
       </div>

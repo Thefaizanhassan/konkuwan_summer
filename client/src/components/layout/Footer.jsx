@@ -4,7 +4,8 @@ import whiteLogo from '../../assets/konkuwan_logo_white.svg';
 export default function Footer() {
   return (
     <footer className="bg-[#0A110C] text-white/50 py-12">
-      <div className="max-w-6xl mx-auto px-6">
+      {/* <div className="max-w-6xl mx-auto px-6"> */}
+      <div className="container-kk">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 pb-8 border-b border-white/10">
           <div>
             <img src={whiteLogo} alt="Konkuwan Herbs" className="h-10 mb-4 opacity-80" />

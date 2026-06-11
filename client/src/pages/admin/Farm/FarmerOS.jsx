@@ -21,19 +21,26 @@ export default function FarmerOS() {
   const [visitForm, setVisitForm] = useState({ date: new Date().toISOString().slice(0,10), status: 'Good', note: '' });
   const [visitTarget, setVisitTarget] = useState(null);
 
-  const { data: farmers } = useQuery(['farm-farmers'], () => apiClient.get('/admin/farm/farmers').then(r => r.data.data));
+//  const { data: farmers } = useQuery(['farm-farmers'], () => apiClient.get('/admin/farm/farmers').then(r => r.data.data));
+  const { data: farmers } = useQuery({
+    queryKey: ['farm-farmers'],
+    queryFn: () => apiClient.get('/admin/farm/farmers').then(r => r.data.data),
+  });
 
   const enrollFarmer = useMutation({
     mutationFn: (data) => apiClient.post('/admin/farm/farmers', data),
-    onSuccess: () => { queryClient.invalidateQueries(['farm-farmers']); setShowForm(false); },
+    // onSuccess: () => { queryClient.invalidateQueries(['farm-farmers']); setShowForm(false); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['farm-farmers'] }); setShowForm(false); },
   });
   const logVisit = useMutation({
     mutationFn: ({ farmerId, data }) => apiClient.post(`/admin/farm/farmers/${farmerId}/visits`, data),
-    onSuccess: () => { queryClient.invalidateQueries(['farm-farmers']); setVisitTarget(null); },
+    // onSuccess: () => { queryClient.invalidateQueries(['farm-farmers']); setVisitTarget(null); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['farm-farmers'] }); setVisitTarget(null); },
   });
   const deleteFarmer = useMutation({
     mutationFn: (id) => apiClient.delete(`/admin/farm/farmers/${id}`),
-    onSuccess: () => queryClient.invalidateQueries(['farm-farmers']),
+    // onSuccess: () => queryClient.invalidateQueries(['farm-farmers']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-farmers'] }),
   });
 
   const counts = {};
@@ -52,7 +59,7 @@ export default function FarmerOS() {
               <span>{t.emoji} {t.label}</span>
               <span className="font-mono">{counts[t.crop]}/{t.target}</span>
             </div>
-            <div className="h-2 rounded-full bg-gray-200">
+            <div className="h-2 rounded-full bg-cream-dark">
               <div className="h-2 rounded-full" style={{ width: `${Math.min(100, (counts[t.crop]/t.target)*100)}%`, backgroundColor: t.color }} />
             </div>
           </div>

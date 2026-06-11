@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
 import placeholderImg from '../../assets/hero.png';
+import { resolveImageUrl } from '../../lib/imageUrl';
 
 export default function ProductCard({ product }) {
   const primaryImage = product.primary_image || product.images?.[0];
-  const imageUrl = primaryImage?.url || placeholderImg;
+//   const imageUrl = primaryImage?.url || placeholderImg;
+  const imageUrl = resolveImageUrl(primaryImage?.url) || placeholderImg;
 
   return (
     <article className="bg-white border border-border hover:bg-cream transition-colors group cursor-pointer overflow-hidden">

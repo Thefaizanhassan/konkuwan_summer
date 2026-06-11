@@ -79,7 +79,8 @@ export default function Partners() {
         </div>
       </section>
 
-      <section className="py-16 bg-forest text-center relative overflow-hidden">
+      {/* <section className="py-16 bg-forest text-center relative overflow-hidden"> */}
+      <section className="section-kk bg-forest text-center relative overflow-hidden">
         <div className="absolute top-[-80px] right-[-80px] w-[320px] h-[320px] rounded-full bg-white/5"></div>
         <div className="absolute bottom-[-100px] left-[-60px] w-[440px] h-[440px] rounded-full bg-white/5"></div>
         <div className="relative z-10 max-w-xl mx-auto px-4">
