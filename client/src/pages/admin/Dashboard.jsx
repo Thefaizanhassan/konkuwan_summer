@@ -4,8 +4,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import apiClient from '../../services/api';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
+  BarChart, Bar, Legend,
 } from 'recharts';
+
 
 const STATUS_COLORS = {
   delivered:  { bg: '#e2f0e0', color: '#1d6b2e' },
@@ -60,13 +62,26 @@ function KPICard({ label, value, trend, trendUp }) {
   );
 }
 
+const fmtTrend = (t) => (t == null ? null : `${t > 0 ? '+' : ''}${t}%`);
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => apiClient.get('/admin/analytics/dashboard').then(r => r.data),
     staleTime: 60_000,
+    // retry: false, may need to commented out
   });
+
+  const { data: farmData } = useQuery({
+    queryKey: ['farm-analytics'],
+    queryFn: () => apiClient.get('/admin/farm/analytics').then(r => r.data.data),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const expenseCats = farmData?.expense_by_category || [];
+  const farmersByCrop = farmData?.farmers_by_crop || [];
+  const PALETTE = ['#162F22', '#4A7860', '#6A9E7A', '#B8844A', '#C8A84B', '#8FA98F', '#D9CDB8', '#3B5747'];
 
   const kpi = data?.data?.kpi || {};
   const recentOrders = data?.data?.recent_orders || [];
@@ -93,7 +108,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-display text-3xl" style={{ color: '#1c2e1f' }}>
-            Dashboard <small className="font-body text-base font-normal ml-2" style={{ color: '#7b8a76' }}>B2B · Herbal Supply</small>
+            Dashboard <small className="font-body text-base font-normal ml-2" style={{ color: '#7b8a76' }}>Konkuwan Herbs</small>
           </h1>
         </div>
         <div className="flex items-center gap-3">
@@ -117,17 +132,17 @@ export default function Dashboard() {
         <KPICard
           label="Revenue (MTD)"
           value={`₹${Number(kpi.revenue_mtd || 0).toLocaleString('en-IN')}`}
-          trend="+8.2%" trendUp
+          trend={fmtTrend(kpi.revenue_trend)} trendUp={(kpi.revenue_trend ?? 0) >= 0}
         />
         <KPICard
           label="Orders (MTD)"
           value={kpi.orders_mtd ?? 0}
-          trend="+12%" trendUp
+          trend={fmtTrend(kpi.orders_trend)} trendUp={(kpi.orders_trend ?? 0) >= 0}
         />
         <KPICard
           label="Total Customers"
           value={kpi.total_customers ?? 0}
-          trend="+4%" trendUp
+          trend={fmtTrend(kpi.customers_trend)} trendUp={(kpi.customers_trend ?? 0) >= 0}
         />
       </div>
 
@@ -193,6 +208,68 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Operations analytics */}
+      {(expenseCats.length > 0 || farmersByCrop.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 mb-8">
+          <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
+            <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>Expenses by Category</h3>
+            {expenseCats.length === 0 ? (
+              <p className="text-sm text-muted text-center py-8">No expense data yet</p>
+            ) : (
+              <>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={expenseCats} dataKey="total" nameKey="category"
+                           innerRadius={55} outerRadius={85} paddingAngle={2}>
+                        {expenseCats.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+                      </Pie>
+                      <Tooltip formatter={v => `₹${Number(v).toLocaleString('en-IN')}`} />
+                      <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <table className="w-full text-sm mt-2">
+                  <tbody>
+                    {expenseCats.map((c, i) => (
+                      <tr key={c.category} style={{ borderTop: '1px solid #f1ebe2' }}>
+                        <td className="py-1.5 capitalize">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full mr-2" style={{ background: PALETTE[i % PALETTE.length] }} />
+                          {c.category}
+                        </td>
+                        <td className="py-1.5 text-right font-semibold" style={{ color: '#1c2e1f' }}>
+                          ₹{Number(c.total).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+          </div>
+
+          <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
+            <h3 className="font-display text-xl mb-1" style={{ color: '#1c2e1f' }}>Farmers by Crop</h3>
+            <p className="text-xs mb-4" style={{ color: '#7b8a76' }}>Total enrolled: {farmData?.total_farmers ?? 0}</p>
+            {farmersByCrop.length === 0 ? (
+              <p className="text-sm text-muted text-center py-8">No farmers enrolled yet</p>
+            ) : (
+              <div style={{ height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={farmersByCrop} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" vertical={false} />
+                    <XAxis dataKey="crop" tick={{ fontSize: 11, fill: '#6f7a6a' }} axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#6f7a6a' }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(v, name) => name === 'count' ? [v, 'Farmers'] : [`${v} dec`, 'Area']} />
+                    <Bar dataKey="count" fill="#4A7860" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Recent Orders */}
       <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>

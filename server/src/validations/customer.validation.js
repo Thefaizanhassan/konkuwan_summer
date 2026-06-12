@@ -8,6 +8,8 @@ const createCustomerSchema = Joi.object({
   address: Joi.string().optional().allow('', null),
   gstin: Joi.string().max(30).optional().allow('', null),
   notes: Joi.string().optional().allow('', null),
+  lead_status: Joi.string().valid('active_customer', 'potential_lead').default('active_customer'),
+  linkedin_url: Joi.string().uri().max(500).optional().allow('', null),
 });
 
 const updateCustomerSchema = createCustomerSchema.fork(

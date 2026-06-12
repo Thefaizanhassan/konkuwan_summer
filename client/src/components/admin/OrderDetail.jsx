@@ -4,6 +4,7 @@ import Modal from '../ui/Modal';
 import StatusBadge from '../ui/StatusBadge';
 import Button from '../ui/Button';
 import { useState } from 'react';
+import { downloadInvoice } from '../../lib/invoice';
 
 const STATUS_FLOW = {
   draft: ['confirmed', 'cancelled'],

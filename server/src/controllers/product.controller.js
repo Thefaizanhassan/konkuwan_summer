@@ -358,3 +358,36 @@ exports.deleteProductImage = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * POST /api/admin/products/:id/images/link
+ * Attach an image by URL (asset gallery or external link)
+ */
+exports.linkProductImage = async (req, res, next) => {
+  try {
+    const product = await Product.findByPk(req.params.id);
+    if (!product) return next(new AppError('Product not found.', 404));
+
+    const { url, alt_text } = req.body;
+    if (!url || typeof url !== 'string' || url.length > 500) {
+      return next(new AppError('A valid "url" (max 500 chars) is required.', 400));
+    }
+
+    const lastImage = await ProductImage.findOne({
+      where: { product_id: product.id }, order: [['sort_order', 'DESC']],
+    });
+    const count = await ProductImage.count({ where: { product_id: product.id } });
+
+    const image = await ProductImage.create({
+      product_id: product.id,
+      url,
+      alt_text: alt_text || null,
+      is_primary: count === 0, // first image becomes primary automatically
+      sort_order: lastImage ? lastImage.sort_order + 1 : 0,
+    });
+
+    res.status(201).json({ success: true, data: image });
+  } catch (err) {
+    next(err);
+  }
+};

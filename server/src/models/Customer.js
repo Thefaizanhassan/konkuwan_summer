@@ -30,6 +30,15 @@ module.exports = (sequelize) => {
     notes: {
       type: DataTypes.TEXT,
     },
+    lead_status: {
+      type: DataTypes.STRING(30),
+      allowNull: false,
+      defaultValue: 'active_customer',
+      validate: { isIn: [['active_customer', 'potential_lead']] },
+    },
+    linkedin_url: {
+      type: DataTypes.STRING(500),
+    },
   }, {
     tableName: 'customers',
     underscored: true,

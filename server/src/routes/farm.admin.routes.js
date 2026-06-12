@@ -21,5 +21,6 @@ router.get('/cash', farmController.getCash);
 router.put('/cash', farmController.updateCash);
 router.post('/warroom-brief', farmController.generateBrief);
 router.get('/warroom-briefs', farmController.getBriefs);
+router.get('/analytics', farmController.getFarmAnalytics);
 
 module.exports = router;

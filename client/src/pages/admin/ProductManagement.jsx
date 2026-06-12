@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolveImageUrl } from '../../lib/imageUrl';
+import { ASSET_GALLERY } from '../../lib/assetGallery';
 import apiClient from '../../services/api';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
@@ -138,6 +139,9 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
   const [existing, setExisting] = useState(product?.images || []);
   const [uploading, setUploading] = useState(false);
 
+  const [pickedAsset, setPickedAsset] = useState(null);
+  const [imageUrlField, setImageUrlField] = useState('');
+
   const onPickFiles = (e) => {
     const picked = Array.from(e.target.files || []);
     setFiles(picked);
@@ -176,6 +180,10 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
       });
       const productId = saved?.id || product?.id;
       if (productId) await uploadImages(productId);
+      const linkUrl = pickedAsset || imageUrlField;
+      if (productId && linkUrl) {
+        await apiClient.post(`/admin/products/${productId}/images/link`, { url: linkUrl, alt_text: form.name });
+      }
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       onClose();
     } catch (err) {
@@ -264,6 +272,25 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
               className="block w-full text-sm text-muted file:mr-3 file:py-2 file:px-4 file:rounded-sm file:border-0 file:bg-forest file:text-white file:text-sm hover:file:bg-forest-mid"
             />
             <p className="text-[11px] text-muted mt-1">JPG / PNG / WebP, up to 5 files, 5 MB each.</p>
+            {/* OR: pick from bundled asset gallery */}
+            <p className="text-xs uppercase tracking-wide text-muted mt-4 mb-2">Or pick from gallery</p>
+            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto border border-border rounded-sm p-2">
+              {ASSET_GALLERY.map((a) => (
+                <button key={a.url} type="button" title={a.name}
+                  onClick={() => setPickedAsset(pickedAsset === a.url ? null : a.url)}
+                  className={`w-16 h-16 rounded overflow-hidden border-2 ${pickedAsset === a.url ? 'border-forest ring-2 ring-forest' : 'border-transparent'}`}>
+                  <img src={a.url} alt={a.name} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+
+            {/* OR: external URL with live preview */}
+            <p className="text-xs uppercase tracking-wide text-muted mt-4 mb-1">Or paste an image URL</p>
+            <Input type="url" placeholder="https://…" value={imageUrlField} onChange={e => setImageUrlField(e.target.value)} />
+            {imageUrlField && (
+              <img src={imageUrlField} alt="preview" className="w-24 h-24 object-cover rounded border border-dashed border-sage mt-2"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            )}
 
             {previews.length > 0 && (
               <div className="flex flex-wrap gap-3 mt-3">

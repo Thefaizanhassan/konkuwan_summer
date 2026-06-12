@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
 import Button from '../../components/ui/Button';
@@ -17,7 +18,7 @@ export default function Settings() {
 
   const updateSettings = useMutation({
     mutationFn: (settings) => apiClient.put('/admin/settings', { settings: Object.entries(settings).map(([key, value]) => ({ key, value })) }),
-    onSuccess: () => queryClient.invalidateQueries(['settings']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
   });
 
   const handleChange = (key, value) => setForm({ ...form, [key]: value });
@@ -43,7 +44,9 @@ export default function Settings() {
             />
           </div>
         ))}
-        <Button type="submit" disabled={updateSettings.isLoading}>Save Settings</Button>
+        <Button type="submit" disabled={updateSettings.isPending}>
+          {updateSettings.isPending ? 'Saving...' : 'Save Settings'}
+        </Button>
       </form>
     </div>
   );

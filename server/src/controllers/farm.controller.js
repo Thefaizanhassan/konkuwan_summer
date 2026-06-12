@@ -194,3 +194,38 @@ exports.getBriefs = async (req, res, next) => {
   if (error) return next(new AppError(error.message, 500));
   res.json({ success: true, data });
 };
+
+// GET /api/admin/farm/analytics — expense by category + farmers by crop
+exports.getFarmAnalytics = async (req, res, next) => {
+  const [{ data: expenses, error: e1 }, { data: farmers, error: e2 }] = await Promise.all([
+    supabase.from('expenses').select('type, category, amount'),
+    supabase.from('farmers').select('crop, area_decimal'),
+  ]);
+  if (e1 || e2) return next(new AppError((e1 || e2).message, 500));
+
+  const expenseByCategory = {};
+  (expenses || []).filter(e => e.type === 'expense').forEach(e => {
+    const k = e.category || 'other';
+    expenseByCategory[k] = (expenseByCategory[k] || 0) + parseFloat(e.amount || 0);
+  });
+
+  const farmersByCrop = {};
+  (farmers || []).forEach(f => {
+    const k = f.crop || 'unknown';
+    if (!farmersByCrop[k]) farmersByCrop[k] = { count: 0, area_decimal: 0 };
+    farmersByCrop[k].count += 1;
+    farmersByCrop[k].area_decimal += parseFloat(f.area_decimal || 0);
+  });
+
+  res.json({
+    success: true,
+    data: {
+      expense_by_category: Object.entries(expenseByCategory)
+        .map(([category, total]) => ({ category, total }))
+        .sort((a, b) => b.total - a.total),
+      farmers_by_crop: Object.entries(farmersByCrop)
+        .map(([crop, v]) => ({ crop, ...v })),
+      total_farmers: (farmers || []).length,
+    },
+  });
+};

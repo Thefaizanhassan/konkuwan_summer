@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../../../lib/supabase';
 import apiClient from '../../../services/api';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
@@ -20,6 +21,8 @@ export default function FinanceOS() {
   const [expForm, setExpForm] = useState({ date: new Date().toISOString().slice(0,10), by: 'CRP', amount: '', category: 'labour', description: '' });
   const [revForm, setRevForm] = useState({ date: new Date().toISOString().slice(0,10), amount: '', note: '' });
   const [cashVal, setCashVal] = useState('');
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
 //  const { data: expenses } = useQuery(['farm-expenses'], () => apiClient.get('/admin/farm/expenses').then(r => r.data.data));
 //  const { data: cash } = useQuery(['farm-cash'], () => apiClient.get('/admin/farm/cash').then(r => r.data.data));
@@ -131,11 +134,35 @@ export default function FinanceOS() {
             </button>
           ))}
         </div>
+        <div>
+          <label className="block text-xs uppercase tracking-wider text-muted mb-1">Bill / Receipt (optional)</label>
+          <input type="file" accept="application/pdf,image/jpeg,image/png"
+            onChange={e => setReceiptFile(e.target.files?.[0] || null)}
+            className="block w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:bg-forest file:text-white" />
+          {receiptFile && <p className="text-xs text-muted mt-1">{receiptFile.name} ({Math.round(receiptFile.size/1024)} KB)</p>}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Input type="number" placeholder="Amount" value={expForm.amount} onChange={e => setExpForm({...expForm, amount: e.target.value})} />
           <Input placeholder="Description" value={expForm.description} onChange={e => setExpForm({...expForm, description: e.target.value})} />
         </div>
-        <Button fullWidth onClick={() => addExpense.mutate({ ...expForm, amount: parseFloat(expForm.amount) })}>Add Expense</Button>
+        {/* <Button fullWidth onClick={() => addExpense.mutate({ ...expForm, amount: parseFloat(expForm.amount) })}>Add Expense</Button> */}
+        <Button fullWidth disabled={addExpense.isPending || uploadingReceipt}
+          onClick={async () => {
+            let receipt_url = null;
+            if (receiptFile) {
+              if (receiptFile.size > 5 * 1024 * 1024) return alert('Receipt must be under 5 MB.');
+              setUploadingReceipt(true);
+              const path = `${Date.now()}-${receiptFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+              const { error } = await supabase.storage.from('receipts').upload(path, receiptFile);
+              setUploadingReceipt(false);
+              if (error) return alert('Receipt upload failed: ' + error.message);
+              receipt_url = supabase.storage.from('receipts').getPublicUrl(path).data.publicUrl;
+            }
+            addExpense.mutate({ ...expForm, amount: parseFloat(expForm.amount), receipt_url });
+            setReceiptFile(null);
+          }}>
+          {uploadingReceipt ? 'Uploading receipt…' : 'Add Expense'}
+        </Button>
       </div>
 
       {/* Recent transactions */}
@@ -148,6 +175,10 @@ export default function FinanceOS() {
               <span>{cat?.emoji || '📦'}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{e.description}</p>
+                {e.receipt_url && (
+                  <a href={e.receipt_url} target="_blank" rel="noopener noreferrer"
+                     className="text-xs text-sage hover:text-forest">📎 Receipt</a>
+                )}
                 <p className="text-xs text-muted">{e.date} · {e.logged_by_name}</p>
               </div>
               {/* <span className="font-mono font-bold">₹{e.amount.toLocaleString()}</span> */}

@@ -81,3 +81,45 @@ exports.deleteCustomer = async (req, res, next) => {
     next(err);
   }
 };
+
+// POST /api/admin/customers/import  — body: { customers: [...] }
+// Parses are done client-side (PapaParse); this endpoint validates + dedupes.
+exports.importCustomers = async (req, res, next) => {
+  try {
+    const { customers } = req.body;
+    if (!Array.isArray(customers) || customers.length === 0) {
+      return next(new AppError('Request body must contain a non-empty "customers" array.', 400));
+    }
+    if (customers.length > 1000) {
+      return next(new AppError('Maximum 1000 customers per import.', 400));
+    }
+
+    const { Op } = require('sequelize');
+    const summary = { imported: 0, skipped: 0, errors: [] };
+
+    for (let i = 0; i < customers.length; i++) {
+      const row = customers[i];
+      const { error, value } = createCustomerSchema.validate(row, { stripUnknown: true });
+      if (error) {
+        summary.skipped++;
+        summary.errors.push({ row: i + 1, company: row.company_name || '—', reason: error.details[0].message });
+        continue;
+      }
+      // Duplicate check: same company_name (case-insensitive) OR same non-empty email
+      const dupWhere = [{ company_name: { [Op.iLike]: value.company_name } }];
+      if (value.email) dupWhere.push({ email: { [Op.iLike]: value.email } });
+      const existing = await Customer.findOne({ where: { [Op.or]: dupWhere } });
+      if (existing) {
+        summary.skipped++;
+        summary.errors.push({ row: i + 1, company: value.company_name, reason: 'Duplicate (company name or email already exists)' });
+        continue;
+      }
+      await Customer.create(value);
+      summary.imported++;
+    }
+
+    res.status(201).json({ success: true, data: summary });
+  } catch (err) {
+    next(err);
+  }
+};

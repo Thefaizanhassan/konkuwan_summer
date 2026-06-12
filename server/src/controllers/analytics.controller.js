@@ -57,6 +57,26 @@ exports.getDashboardStats = async (req, res, next) => {
     // Total customers
     const totalCustomers = await Customer.count();
 
+    // ── Previous month comparisons for trend chips ──
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfPrevMonth   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const revenuePrev = await Order.sum('total_amount', {
+      where: { status: 'delivered', order_date: { [Op.between]: [startOfPrevMonth, endOfPrevMonth] } },
+    }) || 0;
+
+    const ordersPrev = await Order.count({
+      where: { status: { [Op.ne]: 'cancelled' }, order_date: { [Op.between]: [startOfPrevMonth, endOfPrevMonth] } },
+    });
+
+    const customersPrev = await Customer.count({
+      where: { created_at: { [Op.lt]: startOfMonth } },
+    });
+
+    // null when there is no baseline to compare against
+    const pct = (current, previous) =>
+      previous > 0 ? Number((((current - previous) / previous) * 100).toFixed(1)) : null;
+
     // Recent 5 orders
     const recentOrders = await Order.findAll({
       include: [
@@ -143,6 +163,9 @@ exports.getDashboardStats = async (req, res, next) => {
           revenue_mtd: revenueMTD,
           orders_mtd: ordersMTD,
           total_customers: totalCustomers,
+          revenue_trend: pct(revenueMTD, revenuePrev),
+          orders_trend: pct(ordersMTD, ordersPrev),
+          customers_trend: pct(totalCustomers, customersPrev),
         },
         recent_orders: recentOrders,
         top_products: topProducts,

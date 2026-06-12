@@ -15,5 +15,6 @@ router.delete('/:id', productController.deleteProduct);
 router.post('/:id/images', upload.array('images', 5), productController.uploadProductImages);
 router.put('/:id/images/:imageId/primary', productController.setPrimaryImage);
 router.delete('/:id/images/:imageId', productController.deleteProductImage);
+router.post('/:id/images/link', productController.linkProductImage);
 
 module.exports = router;
