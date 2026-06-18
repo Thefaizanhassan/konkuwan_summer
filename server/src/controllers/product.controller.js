@@ -1,393 +1,135 @@
-const { Op } = require('sequelize');
-const { Product, Category, ProductImage, ProductCategory, PricingHistory, sequelize } = require('../models');
-const { createProductSchema, updateProductSchema } = require('../validations/product.validation');
+const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
-const logger = require('../utils/logger');
-const slugify = require('slugify');
-const auditLog = require('../utils/audit');
+const { createProductSchema, updateProductSchema } = require('../validations/product.validation');
 
-// Helper: generate unique slug
-const generateSlug = async (name, excludeId = null) => {
-  let slug = slugify(name, { lower: true, strict: true });
-  // Check uniqueness
-  const where = { slug };
-  if (excludeId) where.id = { [Op.ne]: excludeId };
-  const existing = await Product.findOne({ where });
-  if (existing) {
-    slug = `${slug}-${Date.now()}`;
+const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+async function uniqueSlug(base) {
+  let slug = slugify(base), n = 1;
+  while (true) {
+    const { data } = await supabase.from('products').select('id').eq('slug', slug).limit(1);
+    if (!data || data.length === 0) return slug;
+    slug = `${slugify(base)}-${++n}`;
   }
-  return slug;
-};
+}
 
-// ── PUBLIC ENDPOINTS ──────────────────────────────────────────────
-
-/**
- * GET /api/products
- * List all active products with optional filters, search, pagination
- */
-exports.getAllProducts = async (req, res, next) => {
+exports.getProducts = async (req, res, next) => {
   try {
-    const {
-      page = 1,
-      limit = 12,
-      search,
-      category,
-      sort = 'created_at',
-      order = 'DESC',
-    } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const from = (page - 1) * limit;
+    const { data, count, error } = await supabase
+      .from('products')
+      .select('*, images:product_images(*), categories:product_category(category:categories(*))', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, from + limit - 1);
+    if (error) return next(new AppError(error.message, 500));
 
-    const where = { is_active: true };
-
-    // Search by name or botanical name
-    if (search) {
-      where[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { botanical_name: { [Op.iLike]: `%${search}%` } },
-      ];
-    }
-
-    // Filter by category slug
-    if (category) {
-      const categoryRecord = await Category.findOne({ where: { slug: category } });
-      if (!categoryRecord) {
-        return next(new AppError('Category not found.', 404));
-      }
-      // Include products belonging to this category
-      const productIds = await ProductCategory.findAll({
-        where: { category_id: categoryRecord.id },
-        attributes: ['product_id'],
-      });
-      where.id = productIds.map((p) => p.product_id);
-    }
-
-    const offset = (page - 1) * limit;
-
-    const { count, rows } = await Product.findAndCountAll({
-      where,
-      include: [
-        {
-          model: Category,
-          through: { attributes: [] },
-          attributes: ['id', 'name', 'slug'],
-        },
-        {
-          model: ProductImage,
-          as: 'images',
-          attributes: ['id', 'url', 'alt_text', 'is_primary'],
-          separate: true, // to order them
-          order: [['sort_order', 'ASC']],
-        },
-      ],
-      order: [[sort, order]],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      distinct: true,
-    });
-
-    // Format response: first primary image as main image
-    const products = rows.map((product) => {
-      const productJSON = product.toJSON();
-      const primaryImage = productJSON.images?.find((img) => img.is_primary) || productJSON.images?.[0];
-      productJSON.primary_image = primaryImage || null;
-      return productJSON;
-    });
-
-    res.json({
-      success: true,
-      data: products,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        pages: Math.ceil(count / limit),
-      },
-    });
-  } catch (err) {
-    next(err);
-  }
+    const withPrimary = (data || []).map(p => ({
+      ...p,
+      primary_image: (p.images || []).find(i => i.is_primary) || (p.images || [])[0] || null,
+    }));
+    res.json({ success: true, data: withPrimary, pagination: { total: count, page, pages: Math.ceil((count || 0) / limit) } });
+  } catch (err) { next(err); }
 };
 
-/**
- * GET /api/products/:slug
- * Get single product by slug with images and categories
- */
 exports.getProductBySlug = async (req, res, next) => {
   try {
-    const product = await Product.findOne({
-      where: { slug: req.params.slug, is_active: true },
-      include: [
-        {
-          model: Category,
-          through: { attributes: [] },
-          attributes: ['id', 'name', 'slug'],
-        },
-        {
-          model: ProductImage,
-          as: 'images',
-          attributes: ['id', 'url', 'alt_text', 'is_primary', 'sort_order'],
-          separate: true,
-          order: [['sort_order', 'ASC']],
-        },
-      ],
-    });
-
-    if (!product) {
-      return next(new AppError('Product not found.', 404));
-    }
-
-    res.json({ success: true, data: product });
-  } catch (err) {
-    next(err);
-  }
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, images:product_images(*), categories:product_category(category:categories(*))')
+      .eq('slug', req.params.slug).single();
+    if (error || !data) return next(new AppError('Product not found.', 404));
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
 };
 
-// ── ADMIN ENDPOINTS ──────────────────────────────────────────────
-
-/**
- * POST /api/admin/products
- * Create a new product
- */
 exports.createProduct = async (req, res, next) => {
-  const transaction = await sequelize.transaction();
   try {
-    const { error, value } = createProductSchema.validate(req.body);
-    if (error) return next(new AppError(error.details[0].message, 400));
+    const { error: vErr, value } = createProductSchema.validate(req.body);
+    if (vErr) return next(new AppError(vErr.details[0].message, 400));
+    const { category_ids, ...fields } = value;
+    fields.slug = await uniqueSlug(fields.name);
 
-    // Generate slug
-    const slug = await generateSlug(value.name);
+    const { data: product, error } = await supabase.from('products').insert(fields).select().single();
+    if (error) return next(new AppError(error.message, 500));
 
-    const product = await Product.create(
-      {
-        ...value,
-        slug,
-        created_by: req.user.id,
-      },
-      { transaction }
-    );
-
-    // Attach categories if provided
-    if (value.category_ids && value.category_ids.length > 0) {
-      await product.setCategories(value.category_ids, { transaction });
+    if (Array.isArray(category_ids) && category_ids.length) {
+      await supabase.from('product_category').insert(category_ids.map(cid => ({ product_id: product.id, category_id: cid })));
     }
-
-    await transaction.commit();
-
-    await auditLog({
-        user: req.user,
-        action: 'CREATE',
-        entity_type: 'product',
-        entity_id: product.id,
-        new_values: { name: value.name, slug: product.slug, price_min: value.price_min, price_max: value.price_max },
-    });
-
-    // Fetch with associations
-    const fullProduct = await Product.findByPk(product.id, {
-      include: [
-        { model: Category, through: { attributes: [] } },
-        { model: ProductImage, as: 'images' },
-      ],
-    });
-
-    res.status(201).json({ success: true, data: fullProduct });
-  } catch (err) {
-    await transaction.rollback();
-    next(err);
-  }
+    res.status(201).json({ success: true, data: product });
+  } catch (err) { next(err); }
 };
 
-/**
- * PUT /api/admin/products/:id
- * Update a product (by UUID)
- */
 exports.updateProduct = async (req, res, next) => {
-  const transaction = await sequelize.transaction();
   try {
-    const product = await Product.findByPk(req.params.id);
-    if (!product) return next(new AppError('Product not found.', 404));
+    const { error: vErr, value } = updateProductSchema.validate(req.body);
+    if (vErr) return next(new AppError(vErr.details[0].message, 400));
+    const { category_ids, ...fields } = value;
+    fields.updated_at = new Date().toISOString();
 
-    const { error, value } = updateProductSchema.validate(req.body);
-    if (error) return next(new AppError(error.details[0].message, 400));
+    const { data, error } = await supabase.from('products').update(fields).eq('id', req.params.id).select().single();
+    if (error) return next(new AppError(error.message, 500));
+    if (!data) return next(new AppError('Product not found.', 404));
 
-    // If name changes, regenerate slug (keeping old if name unchanged)
-    if (value.name && value.name !== product.name) {
-      value.slug = await generateSlug(value.name, product.id);
+    if (Array.isArray(category_ids)) {
+      await supabase.from('product_category').delete().eq('product_id', req.params.id);
+      if (category_ids.length)
+        await supabase.from('product_category').insert(category_ids.map(cid => ({ product_id: req.params.id, category_id: cid })));
     }
-
-    value.updated_by = req.user.id;
-
-    await product.update(value, { transaction });
-
-    if (value.price_min !== undefined || value.price_max !== undefined) {
-        await PricingHistory.create({
-            product_id: product.id,
-            price_min: value.price_min ?? product.price_min,
-            price_max: value.price_max ?? product.price_max,
-            effective_date: new Date(),
-            changed_by: req.user.id,
-            notes: 'Price range updated via product management',
-        }, { transaction });
-    }
-
-    // Update categories
-    if (value.category_ids) {
-      await product.setCategories(value.category_ids, { transaction });
-    }
-
-    await transaction.commit();
-
-    const updatedProduct = await Product.findByPk(product.id, {
-      include: [
-        { model: Category, through: { attributes: [] } },
-        { model: ProductImage, as: 'images' },
-      ],
-    });
-
-    res.json({ success: true, data: updatedProduct });
-  } catch (err) {
-    await transaction.rollback();
-    next(err);
-  }
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
 };
 
-/**
- * DELETE /api/admin/products/:id
- * Soft delete (archive) a product
- */
 exports.deleteProduct = async (req, res, next) => {
   try {
-    const product = await Product.findByPk(req.params.id);
-    if (!product) return next(new AppError('Product not found.', 404));
-
-    product.is_active = false;
-    product.updated_by = req.user.id;
-    await product.save();
-
+    // Soft archive (keeps order history intact)
+    const { data, error } = await supabase.from('products').update({ is_active: false }).eq('id', req.params.id).select().single();
+    if (error) return next(new AppError(error.message, 500));
+    if (!data) return next(new AppError('Product not found.', 404));
     res.json({ success: true, message: 'Product archived.' });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
-/**
- * POST /api/admin/products/:id/images
- * Upload images for a product
- */
 exports.uploadProductImages = async (req, res, next) => {
   try {
-    const product = await Product.findByPk(req.params.id);
-    if (!product) return next(new AppError('Product not found.', 404));
-
     const files = req.files;
-    if (!files || files.length === 0) {
-      return next(new AppError('No images uploaded.', 400));
-    }
-
-    // Get the highest sort order to append new images
-    const lastImage = await ProductImage.findOne({
-      where: { product_id: product.id },
-      order: [['sort_order', 'DESC']],
-    });
-    let nextOrder = lastImage ? lastImage.sort_order + 1 : 0;
-
-    const images = files.map((file, index) => ({
-      product_id: product.id,
-      url: `/uploads/products/${file.filename}`,
-      alt_text: file.originalname,
-      is_primary: false, // first uploaded may be set later
-      sort_order: nextOrder + index,
-    }));
-
-    const createdImages = await ProductImage.bulkCreate(images);
-
-    res.status(201).json({ success: true, data: createdImages });
-  } catch (err) {
-    next(err);
-  }
+    if (!files || !files.length) return next(new AppError('No images uploaded.', 400));
+    const { data: last } = await supabase.from('product_images').select('sort_order').eq('product_id', req.params.id).order('sort_order', { ascending: false }).limit(1);
+    let next0 = last && last.length ? last[0].sort_order + 1 : 0;
+    const { count } = await supabase.from('product_images').select('id', { count: 'exact', head: true }).eq('product_id', req.params.id);
+    const rows = files.map((f, i) => ({ product_id: req.params.id, url: `/uploads/products/${f.filename}`, alt_text: f.originalname, is_primary: (count || 0) === 0 && i === 0, sort_order: next0 + i }));
+    const { data, error } = await supabase.from('product_images').insert(rows).select();
+    if (error) return next(new AppError(error.message, 500));
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
 };
 
-/**
- * PUT /api/admin/products/:id/images/:imageId/primary
- * Set an image as primary
- */
-exports.setPrimaryImage = async (req, res, next) => {
-  try {
-    const product = await Product.findByPk(req.params.id);
-    if (!product) return next(new AppError('Product not found.', 404));
-
-    const image = await ProductImage.findOne({
-      where: { id: req.params.imageId, product_id: product.id },
-    });
-    if (!image) return next(new AppError('Image not found.', 404));
-
-    // Remove primary from all others
-    await ProductImage.update(
-      { is_primary: false },
-      { where: { product_id: product.id } }
-    );
-
-    image.is_primary = true;
-    await image.save();
-
-    res.json({ success: true, data: image });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * DELETE /api/admin/products/:id/images/:imageId
- * Delete an image
- */
-exports.deleteProductImage = async (req, res, next) => {
-  try {
-    const image = await ProductImage.findOne({
-      where: { id: req.params.imageId, product_id: req.params.id },
-    });
-    if (!image) return next(new AppError('Image not found.', 404));
-
-    // Optionally delete file from disk (using fs module)
-    const fs = require('fs');
-    const path = require('path');
-    const filePath = path.join(__dirname, '..', '..', image.url);
-    fs.unlink(filePath, (err) => {
-      if (err) logger.warn('File deletion failed: ' + filePath);
-    });
-
-    await image.destroy();
-    res.json({ success: true, message: 'Image deleted.' });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * POST /api/admin/products/:id/images/link
- * Attach an image by URL (asset gallery or external link)
- */
 exports.linkProductImage = async (req, res, next) => {
   try {
-    const product = await Product.findByPk(req.params.id);
-    if (!product) return next(new AppError('Product not found.', 404));
-
     const { url, alt_text } = req.body;
-    if (!url || typeof url !== 'string' || url.length > 500) {
-      return next(new AppError('A valid "url" (max 500 chars) is required.', 400));
-    }
+    if (!url || url.length > 500) return next(new AppError('A valid "url" (max 500 chars) is required.', 400));
+    const { count } = await supabase.from('product_images').select('id', { count: 'exact', head: true }).eq('product_id', req.params.id);
+    const { data, error } = await supabase.from('product_images')
+      .insert({ product_id: req.params.id, url, alt_text: alt_text || null, is_primary: (count || 0) === 0 })
+      .select().single();
+    if (error) return next(new AppError(error.message, 500));
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+};
 
-    const lastImage = await ProductImage.findOne({
-      where: { product_id: product.id }, order: [['sort_order', 'DESC']],
-    });
-    const count = await ProductImage.count({ where: { product_id: product.id } });
+exports.setPrimaryImage = async (req, res, next) => {
+  try {
+    await supabase.from('product_images').update({ is_primary: false }).eq('product_id', req.params.id);
+    const { data, error } = await supabase.from('product_images').update({ is_primary: true }).eq('id', req.params.imageId).select().single();
+    if (error) return next(new AppError(error.message, 500));
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
 
-    const image = await ProductImage.create({
-      product_id: product.id,
-      url,
-      alt_text: alt_text || null,
-      is_primary: count === 0, // first image becomes primary automatically
-      sort_order: lastImage ? lastImage.sort_order + 1 : 0,
-    });
-
-    res.status(201).json({ success: true, data: image });
-  } catch (err) {
-    next(err);
-  }
+exports.deleteProductImage = async (req, res, next) => {
+  try {
+    const { error } = await supabase.from('product_images').delete().eq('id', req.params.imageId).eq('product_id', req.params.id);
+    if (error) return next(new AppError(error.message, 500));
+    res.json({ success: true, message: 'Image deleted.' });
+  } catch (err) { next(err); }
 };

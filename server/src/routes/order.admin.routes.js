@@ -9,7 +9,7 @@ router.get('/', orderController.getAllOrders);
 router.get('/:id', orderController.getOrderById);
 router.post('/', orderController.createOrder);
 router.put('/:id/status', orderController.updateOrderStatus);
-router.put('/:id/items/:itemId/final-price', orderController.setFinalPrice);
+router.put('/:id/items/:itemId/final-price', orderController.setItemFinalPrice);
 router.get('/:id/invoice', orderController.generateInvoice);
 
 module.exports = router;

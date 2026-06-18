@@ -1,125 +1,91 @@
-const { Customer } = require('../models');
+const supabase = require('../config/supabaseAdmin');
 const { createCustomerSchema, updateCustomerSchema } = require('../validations/customer.validation');
 const AppError = require('../utils/AppError');
 
-// Admin: list customers
 exports.getAllCustomers = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, search } = req.query;
-    const where = {};
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search;
+    const from = (page - 1) * limit;
+
+    let q = supabase.from('customers').select('*', { count: 'exact' });
     if (search) {
-      const { Op } = require('sequelize');
-      where[Op.or] = [
-        { company_name: { [Op.iLike]: `%${search}%` } },
-        { contact_person: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
-      ];
+      q = q.or(`company_name.ilike.%${search}%,contact_person.ilike.%${search}%,email.ilike.%${search}%`);
     }
-    const offset = (page - 1) * limit;
-    const { count, rows } = await Customer.findAndCountAll({
-      where,
-      order: [['company_name', 'ASC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-    });
+    q = q.order('company_name', { ascending: true }).range(from, from + limit - 1);
+
+    const { data, count, error } = await q;
+    if (error) return next(new AppError(error.message, 500));
+
     res.json({
       success: true,
-      data: rows,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        pages: Math.ceil(count / limit),
-      },
+      data,
+      pagination: { total: count, page, pages: Math.ceil((count || 0) / limit) },
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
 exports.getCustomerById = async (req, res, next) => {
   try {
-    const customer = await Customer.findByPk(req.params.id);
-    if (!customer) return next(new AppError('Customer not found.', 404));
-    res.json({ success: true, data: customer });
-  } catch (err) {
-    next(err);
-  }
+    const { data, error } = await supabase.from('customers').select('*').eq('id', req.params.id).single();
+    if (error || !data) return next(new AppError('Customer not found.', 404));
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
 };
 
 exports.createCustomer = async (req, res, next) => {
   try {
-    const { error, value } = createCustomerSchema.validate(req.body);
-    if (error) return next(new AppError(error.details[0].message, 400));
-    const customer = await Customer.create(value);
-    res.status(201).json({ success: true, data: customer });
-  } catch (err) {
-    next(err);
-  }
+    const { error: vErr, value } = createCustomerSchema.validate(req.body);
+    if (vErr) return next(new AppError(vErr.details[0].message, 400));
+    const { data, error } = await supabase.from('customers').insert(value).select().single();
+    if (error) return next(new AppError(error.message, 500));
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
 };
 
 exports.updateCustomer = async (req, res, next) => {
   try {
-    const customer = await Customer.findByPk(req.params.id);
-    if (!customer) return next(new AppError('Customer not found.', 404));
-    const { error, value } = updateCustomerSchema.validate(req.body);
-    if (error) return next(new AppError(error.details[0].message, 400));
-    await customer.update(value);
-    res.json({ success: true, data: customer });
-  } catch (err) {
-    next(err);
-  }
+    const { error: vErr, value } = updateCustomerSchema.validate(req.body);
+    if (vErr) return next(new AppError(vErr.details[0].message, 400));
+    const { data, error } = await supabase.from('customers').update(value).eq('id', req.params.id).select().single();
+    if (error) return next(new AppError(error.message, 500));
+    if (!data) return next(new AppError('Customer not found.', 404));
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
 };
 
 exports.deleteCustomer = async (req, res, next) => {
   try {
-    const customer = await Customer.findByPk(req.params.id);
-    if (!customer) return next(new AppError('Customer not found.', 404));
-    // Consider soft delete? For now hard delete, but orders reference customer, so ON DELETE RESTRICT will block if orders exist.
-    await customer.destroy();
+    const { error } = await supabase.from('customers').delete().eq('id', req.params.id);
+    if (error) return next(new AppError(error.message, 500));
     res.json({ success: true, message: 'Customer deleted.' });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
-// POST /api/admin/customers/import  — body: { customers: [...] }
-// Parses are done client-side (PapaParse); this endpoint validates + dedupes.
+// CSV import (from the previous round) — Supabase version
 exports.importCustomers = async (req, res, next) => {
   try {
     const { customers } = req.body;
-    if (!Array.isArray(customers) || customers.length === 0) {
+    if (!Array.isArray(customers) || customers.length === 0)
       return next(new AppError('Request body must contain a non-empty "customers" array.', 400));
-    }
-    if (customers.length > 1000) {
-      return next(new AppError('Maximum 1000 customers per import.', 400));
-    }
+    if (customers.length > 1000) return next(new AppError('Maximum 1000 customers per import.', 400));
 
-    const { Op } = require('sequelize');
     const summary = { imported: 0, skipped: 0, errors: [] };
-
     for (let i = 0; i < customers.length; i++) {
-      const row = customers[i];
-      const { error, value } = createCustomerSchema.validate(row, { stripUnknown: true });
-      if (error) {
-        summary.skipped++;
-        summary.errors.push({ row: i + 1, company: row.company_name || '—', reason: error.details[0].message });
-        continue;
-      }
-      // Duplicate check: same company_name (case-insensitive) OR same non-empty email
-      const dupWhere = [{ company_name: { [Op.iLike]: value.company_name } }];
-      if (value.email) dupWhere.push({ email: { [Op.iLike]: value.email } });
-      const existing = await Customer.findOne({ where: { [Op.or]: dupWhere } });
-      if (existing) {
-        summary.skipped++;
-        summary.errors.push({ row: i + 1, company: value.company_name, reason: 'Duplicate (company name or email already exists)' });
-        continue;
-      }
-      await Customer.create(value);
+      const { error: vErr, value } = createCustomerSchema.validate(customers[i], { stripUnknown: true });
+      if (vErr) { summary.skipped++; summary.errors.push({ row: i + 1, company: customers[i].company_name || '—', reason: vErr.details[0].message }); continue; }
+
+      const orFilter = value.email
+        ? `company_name.ilike.${value.company_name},email.ilike.${value.email}`
+        : `company_name.ilike.${value.company_name}`;
+      const { data: dup } = await supabase.from('customers').select('id').or(orFilter).limit(1);
+      if (dup && dup.length) { summary.skipped++; summary.errors.push({ row: i + 1, company: value.company_name, reason: 'Duplicate (company or email exists)' }); continue; }
+
+      const { error } = await supabase.from('customers').insert(value);
+      if (error) { summary.skipped++; summary.errors.push({ row: i + 1, company: value.company_name, reason: error.message }); continue; }
       summary.imported++;
     }
-
     res.status(201).json({ success: true, data: summary });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
