@@ -1,21 +1,63 @@
-const { createClient } = require('@supabase/supabase-js');
+// const { createClient } = require('@supabase/supabase-js');
+const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+// const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+// ── AI provider (switchable: Claude / OpenAI) ────────────────────────────
+// Which provider is used is stored in the settings table (key: ai_provider,
+// value: 'claude' | 'openai') and editable from Admin → Settings.
+// API keys stay server-side in .env (CLAUDE_API_KEY / OPENAI_API_KEY).
 
-// Helper to call Claude
-async function callClaude(system, user) {
+async function getSetting(key) {
+  const { data } = await supabase.from('settings').select('value').eq('key', key).single();
+  return data?.value || null;
+}
+ 
+async function callClaude(system, user, model) {
+  if (!process.env.CLAUDE_API_KEY || process.env.CLAUDE_API_KEY.includes('dummy')) {
+    throw new AppError('Claude API key is not configured on the server (.env CLAUDE_API_KEY).', 503);
+  }
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.CLAUDE_API_KEY, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, system, messages: [{ role: 'user', content: user }] }),
+    body: JSON.stringify({ model, max_tokens: 1000, system, messages: [{ role: 'user', content: user }] }),
   });
   const data = await res.json();
-  if (!data.content) throw new Error('Claude API error');
+  if (!data.content) throw new AppError(data.error?.message || 'Claude API error', 502);
   return data.content.filter(b => b.type === 'text').map(b => b.text).join('');
 }
 
-// Crop setups
+async function callOpenAI(system, user, model) {
+  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.includes('dummy')) {
+    throw new AppError('OpenAI API key is not configured on the server (.env OPENAI_API_KEY).', 503);
+  }
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1000,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+    }),
+  });
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) throw new AppError(data.error?.message || 'OpenAI API error', 502);
+  return text;
+}
+ 
+async function callAI(system, user) {
+  const provider = (await getSetting('ai_provider')) || process.env.AI_PROVIDER || 'claude';
+  if (provider === 'openai') {
+    const model = (await getSetting('ai_model_openai')) || 'gpt-4o-mini';
+    return callOpenAI(system, user, model);
+  }
+  const model = (await getSetting('ai_model_claude')) || 'claude-sonnet-4-20250514';
+  return callClaude(system, user, model);
+}
+ 
+// ── Crop setups ──────────────────────────────────────────────────────────
+ 
 exports.getCrops = async (req, res, next) => {
   const { data, error } = await supabase.from('crop_setups').select('*');
   if (error) return next(new AppError(error.message, 500));
@@ -24,45 +66,45 @@ exports.getCrops = async (req, res, next) => {
 
 exports.updateCrop = async (req, res, next) => {
   const { cropId } = req.params;
-  const { data, error } = await supabase.from('crop_setups').upsert({ crop_id: cropId, ...req.body }, { onConflict: 'crop_id' });
+  const { data, error } = await supabase
+    .from('crop_setups')
+    .upsert({ crop_id: cropId, ...req.body }, { onConflict: 'crop_id' })
+    .select();
   if (error) return next(new AppError(error.message, 500));
   res.json({ success: true, data });
 };
 
 exports.generatePOP = async (req, res, next) => {
-  const { cropId } = req.params;
-  const { data: crop } = await supabase.from('crop_setups').select('*').eq('crop_id', cropId).single();
-  if (!crop || !crop.planting_date) return next(new AppError('Planting date not set.', 400));
+  try {
+    const { cropId } = req.params;
+    const { data: crop } = await supabase.from('crop_setups').select('*').eq('crop_id', cropId).single();
+    if (!crop || !crop.planting_date) return next(new AppError('Planting date not set.', 400));
 
-  // Build prompt similar to original
-//   const prompt = /* assemble system and user prompts using crop data */;
-//   const text = await callClaude(prompt.system, prompt.user);
-//   if (!text) return next(new AppError('Claude generation failed.', 500));
+    const weeksIn = crop.planting_date
+      ? Math.max(0, Math.floor((Date.now() - new Date(crop.planting_date)) / 604800000))
+      : 0;
 
-//   const pop = { week: /* calculated week */, text, date: new Date().toISOString() };
-const weeksIn = crop.planting_date
-  ? Math.max(0, Math.floor((Date.now() - new Date(crop.planting_date)) / 604800000))
-  : 0;
-
-const systemPrompt = `You are an expert agronomist for Indian medicinal herb farming. 
-Give practical, week-specific field tasks for the crop at its current growth stage. 
+const systemPrompt = `You are an expert agronomist for Indian medicinal herb farming.
+Give practical, week-specific field tasks for the crop at its current growth stage.
 Be concise and actionable. Format as a numbered list.`;
 
 const userPrompt = `Crop: ${cropId}
 Weeks since planting: ${weeksIn}
 Generate specific field tasks for this week. Include: irrigation schedule, pest scouting, fertilisation if due, and any stage-specific actions.`;
 
-const text = await callClaude(systemPrompt, userPrompt);
-if (!text) return next(new AppError('Claude generation failed.', 500));
+    const text = await callAI(systemPrompt, userPrompt);
+    if (!text) return next(new AppError('AI generation failed.', 500));
 
-const pop = { week: weeksIn, text, date: new Date().toISOString() };
+    const pop = { week: weeksIn, text, date: new Date().toISOString() };
 
-  const { error } = await supabase.from('crop_setups').update({ pop_json: pop }).eq('crop_id', cropId);
-  if (error) return next(new AppError(error.message, 500));
-  res.json({ success: true, data: pop });
+    const { error } = await supabase.from('crop_setups').update({ pop_json: pop }).eq('crop_id', cropId);
+    if (error) return next(new AppError(error.message, 500));
+    res.json({ success: true, data: pop });
+  } catch (err) { next(err); }
 };
 
-// Observations
+// ── Observations ─────────────────────────────────────────────────────────
+ 
 exports.getObservations = async (req, res, next) => {
   const { cropId } = req.params;
   const { data, error } = await supabase.from('crop_observations').select('*').eq('crop_id', cropId).order('date', { ascending: false });
@@ -72,12 +114,17 @@ exports.getObservations = async (req, res, next) => {
 
 exports.addObservation = async (req, res, next) => {
   const { cropId } = req.params;
-  const { data, error } = await supabase.from('crop_observations').insert({ crop_id: cropId, ...req.body, logged_by: req.user.id }).single();
+  const { data, error } = await supabase
+    .from('crop_observations')
+    .insert({ crop_id: cropId, ...req.body, logged_by: req.user.id })
+    .select()
+    .single();
   if (error) return next(new AppError(error.message, 500));
   res.status(201).json({ success: true, data });
 };
 
-// Expenses
+// ── Expenses ─────────────────────────────────────────────────────────────
+ 
 exports.getExpenses = async (req, res, next) => {
   const { data, error } = await supabase.from('expenses').select('*').order('date', { ascending: false });
   if (error) return next(new AppError(error.message, 500));
@@ -85,7 +132,18 @@ exports.getExpenses = async (req, res, next) => {
 };
 
 exports.addExpense = async (req, res, next) => {
-  const { data, error } = await supabase.from('expenses').insert({ ...req.body, logged_by: req.user.id }).single();
+  // Map form-only fields to real columns: "by" -> logged_by_name, "note" -> description
+  const { by, note, ...rest } = req.body;
+  const { data, error } = await supabase
+    .from('expenses')
+    .insert({
+      ...rest,
+      description: rest.description || note || null,
+      logged_by_name: by || rest.logged_by_name || null,
+      logged_by: req.user.id,
+    })
+    .select()
+    .single();
   if (error) return next(new AppError(error.message, 500));
   res.status(201).json({ success: true, data });
 };
@@ -96,7 +154,7 @@ exports.deleteExpense = async (req, res, next) => {
   res.json({ success: true });
 };
 
-// Farmers
+// ── Farmers ──────────────────────────────────────────────────────────────
 exports.getFarmers = async (req, res, next) => {
   const { data, error } = await supabase.from('farmers').select('*, farmer_visits(*)').order('created_at', { ascending: false });
   if (error) return next(new AppError(error.message, 500));
@@ -104,7 +162,13 @@ exports.getFarmers = async (req, res, next) => {
 };
 
 exports.addFarmer = async (req, res, next) => {
-  const { data, error } = await supabase.from('farmers').insert({ ...req.body, enrolled_by: req.user.id }).single();
+  // "by" is a form-only field (who enrolled) — not a column; the actual user id goes to enrolled_by
+  const { by, ...rest } = req.body;
+  const { data, error } = await supabase
+    .from('farmers')
+    .insert({ ...rest, area_decimal: rest.area_decimal ? parseFloat(rest.area_decimal) : null, enrolled_by: req.user.id })
+    .select()
+    .single();
   if (error) return next(new AppError(error.message, 500));
   res.status(201).json({ success: true, data });
 };
@@ -117,12 +181,17 @@ exports.deleteFarmer = async (req, res, next) => {
 
 exports.addVisit = async (req, res, next) => {
   const { id } = req.params;
-  const { data, error } = await supabase.from('farmer_visits').insert({ farmer_id: id, ...req.body, visited_by: req.user.id }).single();
+  const { data, error } = await supabase
+    .from('farmer_visits')
+    .insert({ farmer_id: id, ...req.body, visited_by: req.user.id })
+    .select()
+    .single();
   if (error) return next(new AppError(error.message, 500));
   res.status(201).json({ success: true, data });
 };
 
-// Cash
+// ── Cash ─────────────────────────────────────────────────────────────────
+
 exports.getCash = async (req, res, next) => {
   const { data, error } = await supabase.from('cash_balance').select('*').order('updated_at', { ascending: false }).limit(1);
   if (error) return next(new AppError(error.message, 500));
@@ -131,28 +200,44 @@ exports.getCash = async (req, res, next) => {
 
 exports.updateCash = async (req, res, next) => {
   const { amount } = req.body;
-  const { data, error } = await supabase.from('cash_balance').insert({ amount: parseFloat(amount), updated_by: req.user.id }).single();
+  if (amount == null || isNaN(parseFloat(amount))) return next(new AppError('A numeric "amount" is required.', 400));
+  const { data, error } = await supabase
+    .from('cash_balance')
+    .insert({ amount: parseFloat(amount), updated_by: req.user.id })
+    .select()
+    .single();
   if (error) return next(new AppError(error.message, 500));
   res.json({ success: true, data });
 };
 
-// War Room
+// ── Finance settings (EMI etc. — values managed in Admin → Settings) ─────
+ 
+exports.getFinanceSettings = async (req, res, next) => {
+  const keys = ['emi_monthly_amount', 'emi_start_date', 'emi_label'];
+  const { data, error } = await supabase.from('settings').select('key,value').in('key', keys);
+  if (error) return next(new AppError(error.message, 500));
+  const out = {};
+  (data || []).forEach((r) => { out[r.key] = r.value; });
+  res.json({ success: true, data: out });
+};
+
+// ── War Room ─────────────────────────────────────────────────────────────
+
 exports.generateBrief = async (req, res, next) => {
-  const { week_ref } = req.body;
-  // Fetch all relevant data (crops, expenses, farmers, cash)
-  const [{ data: crops }, { data: expenses }, { data: farmers }, { data: cash }] = await Promise.all([
-    supabase.from('crop_setups').select('*'),
-    supabase.from('expenses').select('*'),
-    supabase.from('farmers').select('*, farmer_visits(*)'),
-    supabase.from('cash_balance').select('*').order('updated_at', { ascending: false }).limit(1),
-  ]);
-
-  // Build prompts and call Claude (similar to original logic)
-  const cashAmount = cash?.[0]?.amount || 0;
-const totalExpenses = expenses?.reduce((s, e) => e.type === 'expense' ? s + parseFloat(e.amount) : s, 0) || 0;
-const totalRevenue = expenses?.reduce((s, e) => e.type === 'revenue' ? s + parseFloat(e.amount) : s, 0) || 0;
-
-const systemPrompt = `You are a farm operations advisor. Analyse the data and produce a Monday War Room brief as valid JSON only — no markdown, no explanation.
+  try {
+    const { week_ref } = req.body;
+    const [{ data: crops }, { data: expenses }, { data: farmers }, { data: cash }] = await Promise.all([
+      supabase.from('crop_setups').select('*'),
+      supabase.from('expenses').select('*'),
+      supabase.from('farmers').select('*, farmer_visits(*)'),
+      supabase.from('cash_balance').select('*').order('updated_at', { ascending: false }).limit(1),
+    ]);
+ 
+    const cashAmount = cash?.[0]?.amount || 0;
+    const totalExpenses = expenses?.reduce((s, e) => e.type === 'expense' ? s + parseFloat(e.amount) : s, 0) || 0;
+    const totalRevenue = expenses?.reduce((s, e) => e.type === 'revenue' ? s + parseFloat(e.amount) : s, 0) || 0;
+ 
+    const systemPrompt = `You are a farm operations advisor. Analyse the data and produce a Monday War Room brief as valid JSON only — no markdown, no explanation.
 Return exactly this structure:
 {
   "overallStatus": "GREEN" | "AMBER" | "RED",
@@ -163,7 +248,7 @@ Return exactly this structure:
   "founderDecision": string | null
 }`;
 
-const userPrompt = `Week reference: ${week_ref}
+    const userPrompt = `Week reference: ${week_ref}
 Crops: ${JSON.stringify(crops?.map(c => ({ id: c.crop_id, planting_date: c.planting_date })))}
 Farmers enrolled: ${farmers?.length || 0}
 Cash on hand: ₹${cashAmount}
@@ -171,22 +256,21 @@ Monthly expenses: ₹${totalExpenses}
 Monthly revenue: ₹${totalRevenue}
 Generate the War Room brief.`;
 
-const briefText = await callClaude(systemPrompt, userPrompt);
-//   const briefText = await callClaude('...', '...'); // assemble data
-  let briefJson;
-  try {
-    briefJson = JSON.parse(briefText.replace(/```json|```/g, ''));
-  } catch { return next(new AppError('Failed to parse brief.', 500)); }
-
-  // Store brief
-  const { data, error } = await supabase.from('war_room_briefs').insert({
-    week_ref,
-    brief_json: briefJson,
-    generated_by: req.user.id,
-  }).single();
-  if (error) return next(new AppError(error.message, 500));
-
-  res.json({ success: true, data: { brief_json: briefJson, id: data.id } });
+    const briefText = await callAI(systemPrompt, userPrompt);
+    let briefJson;
+    try {
+      briefJson = JSON.parse(briefText.replace(/```json|```/g, ''));
+    } catch { return next(new AppError('Failed to parse brief.', 500)); }
+ 
+    const { data, error } = await supabase
+      .from('war_room_briefs')
+      .insert({ week_ref, brief_json: briefJson, generated_by: req.user.id })
+      .select()
+      .single();
+    if (error) return next(new AppError(error.message, 500));
+ 
+    res.json({ success: true, data: { brief_json: briefJson, id: data.id } });
+  } catch (err) { next(err); }
 };
 
 exports.getBriefs = async (req, res, next) => {

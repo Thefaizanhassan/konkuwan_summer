@@ -1,6 +1,7 @@
 const supabase = require('../config/supabaseAdmin');
 const { createCustomerSchema, updateCustomerSchema } = require('../validations/customer.validation');
 const AppError = require('../utils/AppError');
+const auditLog = require('../utils/audit');
 
 exports.getAllCustomers = async (req, res, next) => {
   try {
@@ -39,6 +40,7 @@ exports.createCustomer = async (req, res, next) => {
     const { error: vErr, value } = createCustomerSchema.validate(req.body);
     if (vErr) return next(new AppError(vErr.details[0].message, 400));
     const { data, error } = await supabase.from('customers').insert(value).select().single();
+    await auditLog({ user: req.user, action: 'CREATE', entity_type: 'customer', entity_id: data.id, new_values: data, ip_address: req.ip });
     if (error) return next(new AppError(error.message, 500));
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
@@ -48,17 +50,21 @@ exports.updateCustomer = async (req, res, next) => {
   try {
     const { error: vErr, value } = updateCustomerSchema.validate(req.body);
     if (vErr) return next(new AppError(vErr.details[0].message, 400));
+    const { data: old } = await supabase.from('customers').select('*').eq('id', req.params.id).single();
     const { data, error } = await supabase.from('customers').update(value).eq('id', req.params.id).select().single();
     if (error) return next(new AppError(error.message, 500));
     if (!data) return next(new AppError('Customer not found.', 404));
+    await auditLog({ user: req.user, action: 'UPDATE', entity_type: 'customer', entity_id: data.id, old_values: old, new_values: data, ip_address: req.ip });
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
 
 exports.deleteCustomer = async (req, res, next) => {
   try {
+    const { data: old } = await supabase.from('customers').select('*').eq('id', req.params.id).single();
     const { error } = await supabase.from('customers').delete().eq('id', req.params.id);
     if (error) return next(new AppError(error.message, 500));
+    await auditLog({ user: req.user, action: 'DELETE', entity_type: 'customer', entity_id: req.params.id, old_values: old, ip_address: req.ip });
     res.json({ success: true, message: 'Customer deleted.' });
   } catch (err) { next(err); }
 };
@@ -86,6 +92,7 @@ exports.importCustomers = async (req, res, next) => {
       if (error) { summary.skipped++; summary.errors.push({ row: i + 1, company: value.company_name, reason: error.message }); continue; }
       summary.imported++;
     }
+    await auditLog({ user: req.user, action: 'IMPORT', entity_type: 'customer', new_values: { imported: summary.imported, skipped: summary.skipped }, ip_address: req.ip });
     res.status(201).json({ success: true, data: summary });
   } catch (err) { next(err); }
 };

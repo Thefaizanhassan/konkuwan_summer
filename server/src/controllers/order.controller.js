@@ -1,5 +1,6 @@
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
+const auditLog = require('../utils/audit');
 const {
   createOrderSchema,
   updateOrderSchema,
@@ -79,6 +80,7 @@ exports.createOrder = async (req, res, next) => {
     }
 
     const { data: full } = await supabase.from('orders').select(ORDER_SELECT).eq('id', order.id).single();
+    await auditLog({ user: req.user, action: 'CREATE', entity_type: 'order', entity_id: order.id, new_values: { customer_id: order.customer_id, status: order.status, total_amount: order.total_amount, items: items.length }, ip_address: req.ip });
     res.status(201).json({ success: true, data: full });
   } catch (err) { next(err); }
 };
@@ -88,9 +90,11 @@ exports.updateOrderStatus = async (req, res, next) => {
     const { error: vErr, value } = updateOrderSchema.validate(req.body);
     if (vErr) return next(new AppError(vErr.details[0].message, 400));
     const patch = { ...value, updated_at: new Date().toISOString() };
+    const { data: old } = await supabase.from('orders').select('id,status,total_amount').eq('id', req.params.id).single();
     const { data, error } = await supabase.from('orders').update(patch).eq('id', req.params.id).select().single();
     if (error) return next(new AppError(error.message, 500));
     if (!data) return next(new AppError('Order not found.', 404));
+    await auditLog({ user: req.user, action: 'UPDATE', entity_type: 'order', entity_id: data.id, old_values: old, new_values: { status: data.status }, ip_address: req.ip });
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
@@ -116,6 +120,7 @@ exports.setItemFinalPrice = async (req, res, next) => {
     );
     await supabase.from('orders').update({ total_amount: total, updated_at: new Date().toISOString() }).eq('id', req.params.id);
 
+    await auditLog({ user: req.user, action: 'UPDATE', entity_type: 'order', entity_id: req.params.id, new_values: { item_id: item.id, final_price: item.final_price, new_total: total }, ip_address: req.ip });
     res.json({ success: true, data: item });
   } catch (err) { next(err); }
 };

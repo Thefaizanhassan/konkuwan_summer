@@ -1,5 +1,6 @@
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
+const auditLog = require('../utils/audit');
 
 exports.getAllSettings = async (req, res, next) => {
   try {
@@ -24,6 +25,9 @@ exports.updateSettings = async (req, res, next) => {
     if (rows.length) {
       const { error } = await supabase.from('settings').upsert(rows, { onConflict: 'key' });
       if (error) return next(new AppError(error.message, 500));
+      const changed = {};
+      rows.forEach((r) => { changed[r.key] = r.value; });
+      await auditLog({ user: req.user, action: 'UPDATE', entity_type: 'settings', new_values: changed, ip_address: req.ip });
     }
 
     const { data, error: readErr } = await supabase.from('settings').select('*');

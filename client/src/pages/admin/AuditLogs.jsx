@@ -18,8 +18,8 @@ export default function AuditLogs() {
   const logs = data?.data || [];
   const pagination = data?.pagination;
 
-  const ENTITY_TYPES = ['product', 'order', 'user', 'customer', 'category'];
-  const ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'DEACTIVATE', 'LOGIN'];
+  const ENTITY_TYPES = ['product', 'order', 'user', 'customer', 'category', 'settings', 'contact'];
+  const ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'DEACTIVATE', 'IMPORT', 'INVITE', 'LOGIN'];
 
   return (
     <div>
@@ -67,7 +67,7 @@ export default function AuditLogs() {
                   <td className="px-4 py-3 text-muted whitespace-nowrap">
                     {new Date(log.created_at).toLocaleString()}
                   </td>
-                  <td className="px-4 py-3">{log.User?.name || log.user_id || '—'}</td>
+                  <td className="px-4 py-3">{log.user?.name || log.user?.email || log.user_id?.slice(0, 8) || '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
                       log.action === 'CREATE' ? 'bg-green-100 text-green-700' :

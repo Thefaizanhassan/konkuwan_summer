@@ -34,6 +34,10 @@ export default function FinanceOS() {
    queryKey: ['farm-cash'],
    queryFn: () => apiClient.get('/admin/farm/cash').then(r => r.data.data),
   });
+  const { data: finSettings } = useQuery({
+   queryKey: ['farm-finance-settings'],
+   queryFn: () => apiClient.get('/admin/farm/finance-settings').then(r => r.data.data),
+  });
 
   const addExpense = useMutation({
     mutationFn: (data) => apiClient.post('/admin/farm/expenses', { ...data, type: 'expense' }),
@@ -62,16 +66,35 @@ export default function FinanceOS() {
   const totalExp = mExp.reduce((s, e) => s + parseFloat(e.amount), 0);
   const totalRev = mRev.reduce((s, e) => s + parseFloat(e.amount), 0);
   const cashAmount = parseFloat(cash?.amount) || 0;
-  const emi = 646532; // simplified for Jun+
+
+  // EMI comes from Settings (emi_monthly_amount / emi_start_date / emi_label) — no hardcoded value.
+  const emi = parseFloat(finSettings?.emi_monthly_amount) || 0;
+  const emiStart = finSettings?.emi_start_date ? new Date(finSettings.emi_start_date) : null;
+  const emiLabel = finSettings?.emi_label || 'EMI';
+  const emiStarted = emiStart ? emiStart <= new Date() : true;
+  const emiStartText = emiStart
+    ? emiStart.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+    : null;
 
   return (
     <div className="space-y-6">
-      {/* EMI Alert */}
-      <div className="bg-forest rounded-xl p-5 text-white">
-        <p className="text-xs uppercase tracking-widest opacity-70">EMI Alert</p>
-        <p className="text-2xl font-mono font-bold">₹{emi.toLocaleString()}/mo</p>
-        <p className="text-xs mt-1 opacity-80">HBF EMI begins June 2026</p>
-      </div>
+      {/* EMI Alert — calculated from Settings, not dummy data */}
+      {emi > 0 ? (
+        <div className="bg-forest rounded-xl p-5 text-white">
+          <p className="text-xs uppercase tracking-widest opacity-70">EMI Alert</p>
+          <p className="text-2xl font-mono font-bold">₹{emi.toLocaleString('en-IN')}/mo</p>
+          <p className="text-xs mt-1 opacity-80">
+            {emiStartText
+              ? `${emiLabel} ${emiStarted ? 'active since' : 'begins'} ${emiStartText}`
+              : emiLabel}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl p-5 border border-dashed text-muted text-sm">
+          No EMI configured. A super admin can set <b>Monthly EMI</b>, <b>EMI Start Date</b> and{' '}
+          <b>EMI Label</b> under Admin → Settings → Farm Finance.
+        </div>
+      )}
 
       {/* Cash position */}
       <div className="bg-white p-4 rounded-lg border">
@@ -80,11 +103,11 @@ export default function FinanceOS() {
           <Input type="number" placeholder="Total cash" value={cashVal} onChange={e => setCashVal(e.target.value)} />
           <Button onClick={() => updateCash.mutate(cashVal)}>Update</Button>
         </div>
-        {cashAmount > 0 && (
+        {cashAmount > 0 && emi > 0 && (
           <div className={`mt-3 p-3 rounded-lg ${
             cashAmount > emi*2 ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
           }`}>
-            Safe deploy: ₹{Math.max(0, cashAmount - emi*2).toLocaleString()}
+            Safe deploy (cash − 2× EMI): ₹{Math.max(0, cashAmount - emi*2).toLocaleString('en-IN')}
           </div>
         )}
       </div>

@@ -19,6 +19,9 @@ const categoryAdminRoutes = require('./routes/category.admin.routes');
 const analyticsAdminRoutes = require('./routes/analytics.admin.routes');
 const farmAdminRoutes = require('./routes/farm.admin.routes');
 
+// Contact routes
+const contactPublicRoutes = require('./routes/contact.public.routes');
+const contactAdminRoutes = require('./routes/contact.admin.routes');
 
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
@@ -99,6 +102,10 @@ app.use('/api/admin/products', productAdminRoutes);
 // Categories
 app.use('/api/categories', categoryPublicRoutes);
 app.use('/api/admin/categories', categoryAdminRoutes);
+ 
+// Contact (public form + admin inbox)
+app.use('/api/contact', contactPublicRoutes);
+app.use('/api/admin/contact', contactAdminRoutes);
 // app.use('/api/products', require('./routes/product.routes'));
 
 // ── Catch-all 404 ──

@@ -19,6 +19,7 @@ router.delete('/farmers/:id', farmController.deleteFarmer);
 router.post('/farmers/:id/visits', farmController.addVisit);
 router.get('/cash', farmController.getCash);
 router.put('/cash', farmController.updateCash);
+router.get('/finance-settings', farmController.getFinanceSettings);
 router.post('/warroom-brief', farmController.generateBrief);
 router.get('/warroom-briefs', farmController.getBriefs);
 router.get('/analytics', farmController.getFarmAnalytics);

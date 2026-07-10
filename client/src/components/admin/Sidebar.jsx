@@ -7,6 +7,7 @@ const menuItems = [
   { to: '/admin/products',  label: 'Products',  icon: '🌿' },
   { to: '/admin/orders',    label: 'Orders',    icon: '📦' },
   { to: '/admin/customers', label: 'Customers', icon: '👥' },
+  { to: '/admin/inquiries', label: 'Inquiries', icon: '📬' },
   { to: '/admin/farm',      label: 'Farm Ops',  icon: '🚜' },
   { to: '/admin/users',     label: 'Users',     icon: '👤', roles: ['super_admin'] },
   { to: '/admin/audit-logs',label: 'Audit Logs',icon: '📜' },

@@ -23,6 +23,7 @@ import Dashboard from './pages/admin/Dashboard';
 import ProductManagement from './pages/admin/ProductManagement';
 import OrderManagement from './pages/admin/OrderManagement';
 import CustomerManagement from './pages/admin/CustomerManagement';
+import ContactInbox from './pages/admin/ContactInbox';
 import UserManagement from './pages/admin/UserManagement';
 import AuditLogs from './pages/admin/AuditLogs';
 import Settings from './pages/admin/Settings';
@@ -57,6 +58,7 @@ export default function App() {
                 <Route path="products" element={<ProductManagement />} />
                 <Route path="orders" element={<OrderManagement />} />
                 <Route path="customers" element={<CustomerManagement />} />
+                <Route path="inquiries" element={<ContactInbox />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="audit-logs" element={<AuditLogs />} />
                 <Route path="settings" element={<Settings />} />
