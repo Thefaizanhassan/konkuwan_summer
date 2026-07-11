@@ -1,5 +1,6 @@
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
+const auditLog = require('../utils/audit');
 const { createProductSchema, updateProductSchema } = require('../validations/product.validation');
 
 const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -17,11 +18,16 @@ exports.getProducts = async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const from = (page - 1) * limit;
-    const { data, count, error } = await supabase
+ 
+    let q = supabase
       .from('products')
-      .select('*, images:product_images(*), categories:product_category(category:categories(*))', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, from + limit - 1);
+      .select('*, images:product_images(*), categories:product_category(category:categories(*))', { count: 'exact' });
+    // The public page lists ALL products; is_active only controls the green
+    // "Available" badge. Pass active_only=true to restrict to available ones.
+    if (req.query.active_only === 'true') q = q.eq('is_active', true);
+    q = q.order('created_at', { ascending: false }).range(from, from + limit - 1);
+ 
+    const { data, count, error } = await q;
     if (error) return next(new AppError(error.message, 500));
 
     const withPrimary = (data || []).map(p => ({
@@ -56,6 +62,7 @@ exports.createProduct = async (req, res, next) => {
     if (Array.isArray(category_ids) && category_ids.length) {
       await supabase.from('product_category').insert(category_ids.map(cid => ({ product_id: product.id, category_id: cid })));
     }
+    await auditLog({ user: req.user, action: 'CREATE', entity_type: 'product', entity_id: product.id, new_values: product, ip_address: req.ip });
     res.status(201).json({ success: true, data: product });
   } catch (err) { next(err); }
 };
@@ -67,6 +74,8 @@ exports.updateProduct = async (req, res, next) => {
     const { category_ids, ...fields } = value;
     fields.updated_at = new Date().toISOString();
 
+    const { data: old } = await supabase.from('products').select('*').eq('id', req.params.id).single();
+ 
     const { data, error } = await supabase.from('products').update(fields).eq('id', req.params.id).select().single();
     if (error) return next(new AppError(error.message, 500));
     if (!data) return next(new AppError('Product not found.', 404));
@@ -76,6 +85,9 @@ exports.updateProduct = async (req, res, next) => {
       if (category_ids.length)
         await supabase.from('product_category').insert(category_ids.map(cid => ({ product_id: req.params.id, category_id: cid })));
     }
+    // Restoring an archived product (is_active false -> true) is an UNARCHIVE
+    const action = old && old.is_active === false && data.is_active === true ? 'UNARCHIVE' : 'UPDATE';
+    await auditLog({ user: req.user, action, entity_type: 'product', entity_id: data.id, old_values: old, new_values: data, ip_address: req.ip });
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
@@ -86,6 +98,7 @@ exports.deleteProduct = async (req, res, next) => {
     const { data, error } = await supabase.from('products').update({ is_active: false }).eq('id', req.params.id).select().single();
     if (error) return next(new AppError(error.message, 500));
     if (!data) return next(new AppError('Product not found.', 404));
+    await auditLog({ user: req.user, action: 'DEACTIVATE', entity_type: 'product', entity_id: data.id, new_values: { is_active: false, name: data.name }, ip_address: req.ip });
     res.json({ success: true, message: 'Product archived.' });
   } catch (err) { next(err); }
 };
@@ -100,6 +113,7 @@ exports.uploadProductImages = async (req, res, next) => {
     const rows = files.map((f, i) => ({ product_id: req.params.id, url: `/uploads/products/${f.filename}`, alt_text: f.originalname, is_primary: (count || 0) === 0 && i === 0, sort_order: next0 + i }));
     const { data, error } = await supabase.from('product_images').insert(rows).select();
     if (error) return next(new AppError(error.message, 500));
+    await auditLog({ user: req.user, action: 'UPDATE', entity_type: 'product', entity_id: req.params.id, new_values: { images_added: rows.length }, ip_address: req.ip });
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 };

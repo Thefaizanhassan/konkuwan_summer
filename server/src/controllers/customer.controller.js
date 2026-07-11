@@ -37,18 +37,20 @@ exports.getCustomerById = async (req, res, next) => {
 
 exports.createCustomer = async (req, res, next) => {
   try {
-    const { error: vErr, value } = createCustomerSchema.validate(req.body);
+    const { error: vErr, value } = createCustomerSchema.validate(req.body, { stripUnknown: true });
     if (vErr) return next(new AppError(vErr.details[0].message, 400));
     const { data, error } = await supabase.from('customers').insert(value).select().single();
-    await auditLog({ user: req.user, action: 'CREATE', entity_type: 'customer', entity_id: data.id, new_values: data, ip_address: req.ip });
     if (error) return next(new AppError(error.message, 500));
+    await auditLog({ user: req.user, action: 'CREATE', entity_type: 'customer', entity_id: data.id, new_values: data, ip_address: req.ip });
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 };
 
 exports.updateCustomer = async (req, res, next) => {
   try {
-    const { error: vErr, value } = updateCustomerSchema.validate(req.body);
+    // stripUnknown: the edit form sends the whole row back (id, created_at, …)
+    // — strip those instead of failing validation with "id is not allowed".
+    const { error: vErr, value } = updateCustomerSchema.validate(req.body, { stripUnknown: true });
     if (vErr) return next(new AppError(vErr.details[0].message, 400));
     const { data: old } = await supabase.from('customers').select('*').eq('id', req.params.id).single();
     const { data, error } = await supabase.from('customers').update(value).eq('id', req.params.id).select().single();

@@ -129,13 +129,18 @@ export default function CustomerManagement() {
 }
 
 function CustomerFormModal({ customer, onClose, onSubmit, isLoading }) {
-  const [form, setForm] = useState(
-    customer || {
-      company_name: '', contact_person: '', email: '', phone: '',
-      address: '', gstin: '', notes: '',
-      lead_status: 'potential_lead', linkedin_url: '',
-    }
-  );
+  // Only editable fields — never send id/created_at/updated_at back to the API
+  const [form, setForm] = useState({
+    company_name: customer?.company_name || '',
+    contact_person: customer?.contact_person || '',
+    email: customer?.email || '',
+    phone: customer?.phone || '',
+    address: customer?.address || '',
+    gstin: customer?.gstin || '',
+    notes: customer?.notes || '',
+    lead_status: customer?.lead_status || 'potential_lead',
+    linkedin_url: customer?.linkedin_url || '',
+  });
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
   const handleSubmit = e => { e.preventDefault(); onSubmit(form); };

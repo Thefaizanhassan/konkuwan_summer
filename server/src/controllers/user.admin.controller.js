@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const auditLog = require('../utils/audit');
 
 exports.listUsers = async (req, res, next) => {
   try {
@@ -36,6 +37,8 @@ exports.updateUser = async (req, res, next) => {
 
     if (error) throw error;
 
+    await auditLog({ user: req.user, action: 'UPDATE', entity_type: 'user', entity_id: id, new_values: { role, is_active, name }, ip_address: req.ip });
+
     return res.status(200).json({
       success: true,
       data,
@@ -57,6 +60,8 @@ exports.deactivateUser = async (req, res, next) => {
       .eq('id', id);
 
     if (error) throw error;
+
+    await auditLog({ user: req.user, action: 'DEACTIVATE', entity_type: 'user', entity_id: id, new_values: { is_active: false }, ip_address: req.ip });
 
     return res.status(200).json({
       success: true,
@@ -82,6 +87,8 @@ exports.inviteUser = async (req, res, next) => {
       );
 
     if (error) throw error;
+
+    await auditLog({ user: req.user, action: 'INVITE', entity_type: 'user', entity_id: data?.user?.id, new_values: { email, role }, ip_address: req.ip });
 
     return res.status(200).json({
       success: true,

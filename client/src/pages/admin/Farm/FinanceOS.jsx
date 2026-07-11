@@ -38,16 +38,26 @@ export default function FinanceOS() {
    queryKey: ['farm-finance-settings'],
    queryFn: () => apiClient.get('/admin/farm/finance-settings').then(r => r.data.data),
   });
+  // Server-computed monthly summary — revenue here includes product sales
+  // from Orders (confirmed/dispatched/delivered), so Finance and Orders stay in sync.
+  const { data: finSummary } = useQuery({
+   queryKey: ['farm-finance-summary'],
+   queryFn: () => apiClient.get('/admin/farm/finance-summary').then(r => r.data.data),
+  });
 
   const addExpense = useMutation({
     mutationFn: (data) => apiClient.post('/admin/farm/expenses', { ...data, type: 'expense' }),
-    // onSuccess: () => queryClient.invalidateQueries(['farm-expenses']),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-expenses'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['farm-expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['farm-finance-summary'] });
+    },
   });
   const addRevenue = useMutation({
     mutationFn: (data) => apiClient.post('/admin/farm/expenses', { ...data, type: 'revenue' }),
-    // onSuccess: () => queryClient.invalidateQueries(['farm-expenses']),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-expenses'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['farm-expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['farm-finance-summary'] });
+    },
   });
   const updateCash = useMutation({
     mutationFn: (amount) => apiClient.put('/admin/farm/cash', { amount }),
@@ -56,15 +66,20 @@ export default function FinanceOS() {
   });
   const deleteEntry = useMutation({
     mutationFn: (id) => apiClient.delete(`/admin/farm/expenses/${id}`),
-    // onSuccess: () => queryClient.invalidateQueries(['farm-expenses']),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-expenses'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['farm-expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['farm-finance-summary'] });
+    },
   });
 
   const thisMonth = new Date().toISOString().slice(0,7);
   const mExp = expenses?.filter(e => e.date.startsWith(thisMonth) && e.type === 'expense') || [];
   const mRev = expenses?.filter(e => e.date.startsWith(thisMonth) && e.type === 'revenue') || [];
-  const totalExp = mExp.reduce((s, e) => s + parseFloat(e.amount), 0);
-  const totalRev = mRev.reduce((s, e) => s + parseFloat(e.amount), 0);
+  // Prefer the server summary (includes order sales); fall back to local sums.
+  const totalExp = finSummary?.expenses ?? mExp.reduce((s, e) => s + parseFloat(e.amount), 0);
+  const loggedRev = finSummary?.logged_revenue ?? mRev.reduce((s, e) => s + parseFloat(e.amount), 0);
+  const productSales = finSummary?.product_sales || 0;
+  const totalRev = loggedRev + productSales;
   const cashAmount = parseFloat(cash?.amount) || 0;
 
   // EMI comes from Settings (emi_monthly_amount / emi_start_date / emi_label) — no hardcoded value.
@@ -116,7 +131,11 @@ export default function FinanceOS() {
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white p-4 rounded-lg border text-center">
           <p className="text-xs uppercase tracking-wider text-green-700">Revenue This Month</p>
-          <p className="text-xl font-mono font-bold text-green-700">₹{totalRev.toLocaleString()}</p>
+          <p className="text-xl font-mono font-bold text-green-700">₹{totalRev.toLocaleString('en-IN')}</p>
+          <p className="text-[11px] text-muted mt-0.5">
+            ₹{loggedRev.toLocaleString('en-IN')} logged + ₹{productSales.toLocaleString('en-IN')} product sales
+            {finSummary?.orders_count ? ` (${finSummary.orders_count} orders)` : ''}
+          </p>
           <button onClick={() => document.getElementById('revSection').classList.toggle('hidden')} className="text-xs text-green-800 underline mt-1">+ Log</button>
         </div>
         <div className="bg-white p-4 rounded-lg border text-center">

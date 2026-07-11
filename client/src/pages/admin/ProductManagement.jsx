@@ -18,7 +18,7 @@ export default function ProductManagement() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-products', page],
     queryFn: () =>
-      apiClient.get('/products', { params: { page, limit: 10 } }).then(r => r.data),
+      apiClient.get('/admin/products', { params: { page, limit: 10 } }).then(r => r.data),
   });
 
 //   const createMutation = useMutation({
@@ -42,7 +42,12 @@ export default function ProductManagement() {
 
   const archiveMutation = useMutation({
     mutationFn: (id) => apiClient.delete(`/admin/products/${id}`),
-    onSuccess: () => queryClient.invalidateQueries(['admin-products']),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-products'] }),
+  });
+ 
+  const unarchiveMutation = useMutation({
+    mutationFn: (id) => apiClient.put(`/admin/products/${id}`, { is_active: true }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-products'] }),
   });
 
   const columns = [
@@ -81,12 +86,21 @@ export default function ProductManagement() {
         onRowClick={handleEdit}
         isLoading={isLoading}
         actions={(row) => (
-          <button
-            onClick={(e) => { e.stopPropagation(); if (window.confirm('Archive this product?')) archiveMutation.mutate(row.id); }}
-            className="text-red-600 text-sm hover:underline"
-          >
-            Archive
-          </button>
+          row.is_active ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); if (window.confirm('Archive this product? It will be hidden from the public site.')) archiveMutation.mutate(row.id); }}
+              className="text-red-600 text-sm hover:underline"
+            >
+              Archive
+            </button>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); unarchiveMutation.mutate(row.id); }}
+              className="text-green-700 text-sm hover:underline"
+            >
+              Unarchive
+            </button>
+          )
         )}
       />
 
@@ -131,6 +145,7 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
     price_min: product?.price_min || '',
     price_max: product?.price_max || '',
     unit: product?.unit || 'kg',
+    tags: product?.tags || '',
     is_active: product?.is_active ?? true,
   });
 
@@ -240,6 +255,26 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
             <Input type="number" value={form.price_max} onChange={e => setForm({ ...form, price_max: e.target.value })} />
           </div>
 
+          <div className="col-span-2">
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Tags (shown on public page)</label>
+            <Input
+              placeholder="e.g. Food processing, Ayurvedic, Export"
+              value={form.tags}
+              onChange={e => setForm({ ...form, tags: e.target.value })}
+            />
+            <p className="text-[11px] text-muted mt-1">
+              Comma-separated. The green "Available" badge is added automatically while the product is active — no need to type it.
+            </p>
+            {form.tags && (
+              <div className="flex gap-1.5 mt-2 flex-wrap">
+                {form.is_active && <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">Available</span>}
+                {form.tags.split(',').map(t => t.trim()).filter(Boolean).map(t => (
+                  <span key={t} className="text-xs px-2 py-0.5 bg-cream-dark text-forest-mid rounded-full">{t}</span>
+                ))}
+              </div>
+            )}
+          </div>
+ 
           {/* Images */}
           <div className="col-span-2">
             <label className="block text-xs uppercase tracking-wide text-muted mb-1">Product Images</label>
@@ -303,7 +338,7 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
 
           <div className="flex items-center gap-2">
             <input type="checkbox" id="active" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
-            <label htmlFor="active" className="text-sm">Active / visible on site</label>
+            <label htmlFor="active" className="text-sm">Available — shows the green "Available" badge on the public site</label>
           </div>
         </div>
         <div className="flex justify-end gap-3 pt-2">

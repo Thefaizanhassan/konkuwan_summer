@@ -1,19 +1,24 @@
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../../services/api';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 
 export default function WarRoom() {
+  const queryClient = useQueryClient();
   const [weekRef, setWeekRef] = useState('');
   const [brief, setBrief] = useState(null);
 
   const generateBrief = useMutation({
     mutationFn: () => apiClient.post('/admin/farm/warroom-brief', { week_ref: weekRef }).then(r => r.data.data),
-    onSuccess: (data) => setBrief(data.brief_json),
+    onSuccess: (data) => {
+      setBrief(data.brief_json);
+      // The brief is stored in war_room_briefs — refresh the saved list below
+      queryClient.invalidateQueries({ queryKey: ['warroom-briefs'] });
+    },
+    onError: (err) => alert(err?.response?.data?.message || 'Brief generation failed.'),
   });
 
-//  const { data: pastBriefs } = useQuery(['warroom-briefs'], () => apiClient.get('/admin/farm/warroom-briefs').then(r => r.data.data));
   const { data: pastBriefs } = useQuery({
     queryKey: ['warroom-briefs'],
     queryFn: () => apiClient.get('/admin/farm/warroom-briefs').then(r => r.data.data),
@@ -31,6 +36,33 @@ export default function WarRoom() {
         </div>
       </div>
 
+      {/* Saved briefs (from the database) */}
+      {pastBriefs?.length > 0 && (
+        <div className="bg-white p-4 rounded-lg border">
+          <h4 className="font-display text-lg mb-2">Saved Briefs</h4>
+          <div className="divide-y divide-border">
+            {pastBriefs.map(b => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setBrief(b.brief_json)}
+                className="w-full flex items-center justify-between py-2 text-left text-sm hover:bg-cream/40 px-2 rounded"
+              >
+                <span>
+                  <span className="font-medium">{b.week_ref || 'Untitled week'}</span>
+                  <span className="text-xs text-muted ml-2">{new Date(b.created_at).toLocaleString('en-IN')}</span>
+                </span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  b.brief_json?.overallStatus === 'GREEN' ? 'bg-green-100 text-green-700'
+                  : b.brief_json?.overallStatus === 'AMBER' ? 'bg-yellow-100 text-yellow-700'
+                  : 'bg-red-100 text-red-700'
+                }`}>{b.brief_json?.overallStatus || '—'}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+ 
       {brief && (
         <div className={`p-5 rounded-xl text-white ${
           brief.overallStatus === 'GREEN' ? 'bg-green-700' : brief.overallStatus === 'AMBER' ? 'bg-yellow-600' : 'bg-red-700'

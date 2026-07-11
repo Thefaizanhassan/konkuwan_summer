@@ -22,7 +22,21 @@ export default function ProductCard({ product }) {
         <h3 className="font-display text-xl text-forest mt-1">{product.name}</h3>
         <p className="text-sm text-muted mt-1">{product.forms}</p>
 
-        <div className="flex gap-2 mt-3 flex-wrap">
+        <div className="flex gap-1.5 mt-3 flex-wrap">
+          {product.is_active && (
+            <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-sm font-medium">
+              Available
+            </span>
+          )}
+          {(product.tags || '')
+            .split(',')
+            .map(t => t.trim())
+            .filter(Boolean)
+            .map(tag => (
+              <span key={tag} className="text-xs px-2 py-0.5 bg-cream-dark text-forest-mid rounded-sm">
+                {tag}
+              </span>
+            ))}
           {product.Categories?.map((cat) => (
             <span key={cat.id} className="text-xs px-2 py-0.5 bg-cream-dark text-forest-mid rounded-sm">
               {cat.name}

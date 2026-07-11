@@ -221,21 +221,100 @@ exports.getFinanceSettings = async (req, res, next) => {
   res.json({ success: true, data: out });
 };
 
+// ── Crop options + farmer coverage targets ───────────────────────────────
+ 
+// Active products double as the farm crop list (no more hardcoded crops).
+exports.getCropOptions = async (req, res, next) => {
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, slug')
+    .eq('is_active', true)
+    .order('name', { ascending: true });
+  if (error) return next(new AppError(error.message, 500));
+  res.json({ success: true, data });
+};
+ 
+// Targets stored in settings.farm_targets as JSON { "<crop-slug>": number }
+exports.getTargets = async (req, res, next) => {
+  const raw = await getSetting('farm_targets');
+  let targets = {};
+  try { targets = raw ? JSON.parse(raw) : {}; } catch { targets = {}; }
+  res.json({ success: true, data: targets });
+};
+ 
+exports.updateTargets = async (req, res, next) => {
+  const { targets } = req.body;
+  if (!targets || typeof targets !== 'object' || Array.isArray(targets)) {
+    return next(new AppError('Request body must contain a "targets" object.', 400));
+  }
+  const clean = {};
+  for (const [k, v] of Object.entries(targets)) {
+    const n = parseInt(v, 10);
+    if (!isNaN(n) && n >= 0) clean[k] = n;
+  }
+  const { error } = await supabase
+    .from('settings')
+    .upsert({ key: 'farm_targets', value: JSON.stringify(clean), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) return next(new AppError(error.message, 500));
+  res.json({ success: true, data: clean });
+};
+ 
+// ── Finance summary (synchronised with Orders) ──────────────────────────
+// Revenue = revenue entries logged in Farm Ops + product sales from orders
+// (status confirmed/dispatched/delivered) in the same month.
+exports.getFinanceSummary = async (req, res, next) => {
+  try {
+    const month = /^\d{4}-\d{2}$/.test(req.query.month || '')
+      ? req.query.month
+      : new Date().toISOString().slice(0, 7);
+    const start = `${month}-01`;
+    const [y, m] = month.split('-').map(Number);
+    const end = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+ 
+    const [{ data: exp, error: e1 }, { data: orders, error: e2 }] = await Promise.all([
+      supabase.from('expenses').select('type, amount').gte('date', start).lt('date', end),
+      supabase.from('orders').select('total_amount, status')
+        .gte('order_date', start).lt('order_date', end)
+        .in('status', ['confirmed', 'dispatched', 'delivered']),
+    ]);
+    if (e1 || e2) return next(new AppError((e1 || e2).message, 500));
+ 
+    const logged_revenue = (exp || []).filter(x => x.type === 'revenue').reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+    const expenses = (exp || []).filter(x => x.type === 'expense').reduce((s, x) => s + parseFloat(x.amount || 0), 0);
+    const product_sales = (orders || []).reduce((s, o) => s + parseFloat(o.total_amount || 0), 0);
+ 
+    res.json({
+      success: true,
+      data: {
+        month,
+        logged_revenue,
+        product_sales,
+        orders_count: (orders || []).length,
+        total_revenue: logged_revenue + product_sales,
+        expenses,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
 // ── War Room ─────────────────────────────────────────────────────────────
 
 exports.generateBrief = async (req, res, next) => {
   try {
     const { week_ref } = req.body;
-    const [{ data: crops }, { data: expenses }, { data: farmers }, { data: cash }] = await Promise.all([
+    const [{ data: crops }, { data: expenses }, { data: farmers }, { data: cash }, { data: salesOrders }] = await Promise.all([
       supabase.from('crop_setups').select('*'),
       supabase.from('expenses').select('*'),
       supabase.from('farmers').select('*, farmer_visits(*)'),
       supabase.from('cash_balance').select('*').order('updated_at', { ascending: false }).limit(1),
+      supabase.from('orders').select('total_amount').in('status', ['confirmed', 'dispatched', 'delivered']),
     ]);
- 
+
     const cashAmount = cash?.[0]?.amount || 0;
     const totalExpenses = expenses?.reduce((s, e) => e.type === 'expense' ? s + parseFloat(e.amount) : s, 0) || 0;
-    const totalRevenue = expenses?.reduce((s, e) => e.type === 'revenue' ? s + parseFloat(e.amount) : s, 0) || 0;
+    const loggedRevenue = expenses?.reduce((s, e) => e.type === 'revenue' ? s + parseFloat(e.amount) : s, 0) || 0;
+    const productSales = salesOrders?.reduce((s, o) => s + parseFloat(o.total_amount || 0), 0) || 0;
+    const totalRevenue = loggedRevenue + productSales;
  
     const systemPrompt = `You are a farm operations advisor. Analyse the data and produce a Monday War Room brief as valid JSON only — no markdown, no explanation.
 Return exactly this structure:
@@ -253,7 +332,7 @@ Crops: ${JSON.stringify(crops?.map(c => ({ id: c.crop_id, planting_date: c.plant
 Farmers enrolled: ${farmers?.length || 0}
 Cash on hand: ₹${cashAmount}
 Monthly expenses: ₹${totalExpenses}
-Monthly revenue: ₹${totalRevenue}
+Revenue (logged ₹${loggedRevenue} + product sales ₹${productSales}): ₹${totalRevenue}
 Generate the War Room brief.`;
 
     const briefText = await callAI(systemPrompt, userPrompt);
