@@ -143,7 +143,7 @@ konkuwan-herbs/
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-org/konkuwan-herbs.git
+   git clone https://github.com/Thefaizanhassan/konkuwan_summer.git
    cd konkuwan-herbs
    ```
 
