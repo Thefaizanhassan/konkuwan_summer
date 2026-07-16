@@ -13,13 +13,25 @@ async function getSetting(key) {
   return data?.value || null;
 }
  
-async function callClaude(system, user, model) {
-  if (!process.env.CLAUDE_API_KEY || process.env.CLAUDE_API_KEY.includes('dummy')) {
-    throw new AppError('Claude API key is not configured on the server (.env CLAUDE_API_KEY).', 503);
+// Distinguish "missing" from "placeholder" so the error tells the user
+// exactly what to fix. NOTE: dotenv reads .env ONCE at server start —
+// changing .env requires a server restart to take effect.
+function checkApiKey(name) {
+  const val = (process.env[name] || '').trim();
+  if (!val) {
+    throw new AppError(`${name} is missing from server/.env (or the server was not restarted after adding it). Add the key and restart the server.`, 503);
   }
+  if (/dummy|your[-_]|xxxx|change/i.test(val)) {
+    throw new AppError(`${name} in server/.env still contains a placeholder value ("${val.slice(0, 12)}…"). Replace it with a real API key and restart the server.`, 503);
+  }
+  return val;
+}
+ 
+async function callClaude(system, user, model) {
+  const apiKey = checkApiKey('CLAUDE_API_KEY');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.CLAUDE_API_KEY, 'anthropic-version': '2023-06-01' },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model, max_tokens: 1000, system, messages: [{ role: 'user', content: user }] }),
   });
   const data = await res.json();
@@ -28,12 +40,10 @@ async function callClaude(system, user, model) {
 }
 
 async function callOpenAI(system, user, model) {
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY.includes('dummy')) {
-    throw new AppError('OpenAI API key is not configured on the server (.env OPENAI_API_KEY).', 503);
-  }
+  const apiKey = checkApiKey('OPENAI_API_KEY');
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
       max_tokens: 1000,
@@ -66,12 +76,34 @@ exports.getCrops = async (req, res, next) => {
 
 exports.updateCrop = async (req, res, next) => {
   const { cropId } = req.params;
+  // Only real columns — the form may send extra display fields
+  const { planting_date, area_acres, pop_json } = req.body;
+  const patch = { crop_id: cropId, updated_at: new Date().toISOString() };
+  if (planting_date !== undefined) patch.planting_date = planting_date || null;
+  if (area_acres !== undefined) patch.area_acres = area_acres === null || area_acres === '' ? null : parseFloat(area_acres);
+  if (pop_json !== undefined) patch.pop_json = pop_json;
+
   const { data, error } = await supabase
     .from('crop_setups')
-    .upsert({ crop_id: cropId, ...req.body }, { onConflict: 'crop_id' })
+    .upsert(patch, { onConflict: 'crop_id' })
     .select();
-  if (error) return next(new AppError(error.message, 500));
+  if (error) {
+    // Without the crop_id UNIQUE constraint the upsert cannot work — point
+    // at the migration instead of failing cryptically.
+    if (/no unique|exclusion constraint/i.test(error.message)) {
+      return next(new AppError('Database migration missing: run database/2026-07-11_ops_upgrade.sql in Supabase (adds the crop_setups.crop_id unique constraint).', 500));
+    }
+    return next(new AppError(error.message, 500));
+  }
   res.json({ success: true, data });
+};
+
+// DELETE /admin/farm/crops/:cropId — remove a crop's setup entry
+// (planting date, area, generated POP). Observations are kept.
+exports.deleteCrop = async (req, res, next) => {
+  const { error } = await supabase.from('crop_setups').delete().eq('crop_id', req.params.cropId);
+  if (error) return next(new AppError(error.message, 500));
+  res.json({ success: true, message: 'Crop entry deleted.' });
 };
 
 exports.generatePOP = async (req, res, next) => {
@@ -156,7 +188,10 @@ exports.deleteExpense = async (req, res, next) => {
 
 // ── Farmers ──────────────────────────────────────────────────────────────
 exports.getFarmers = async (req, res, next) => {
-  const { data, error } = await supabase.from('farmers').select('*, farmer_visits(*)').order('created_at', { ascending: false });
+  const { data, error } = await supabase
+    .from('farmers')
+    .select('*, farmer_visits(*, visitor:profiles(name)), enroller:profiles(name)')
+    .order('created_at', { ascending: false });
   if (error) return next(new AppError(error.message, 500));
   res.json({ success: true, data });
 };
@@ -208,6 +243,23 @@ exports.updateCash = async (req, res, next) => {
     .single();
   if (error) return next(new AppError(error.message, 500));
   res.json({ success: true, data });
+};
+
+// GET /admin/farm/cash/history — cash_balance is append-only, so every
+// "Update" is already stored with user + timestamp. This exposes the log.
+exports.getCashHistory = async (req, res, next) => {
+  const { data, error } = await supabase
+    .from('cash_balance')
+    .select('*, user:profiles(name)')
+    .order('updated_at', { ascending: false })
+    .limit(20);
+  if (error) return next(new AppError(error.message, 500));
+  // Attach the previous value to each entry so the UI can show old → new
+  const rows = (data || []).map((row, i, arr) => ({
+    ...row,
+    previous_amount: i < arr.length - 1 ? arr[i + 1].amount : null,
+  }));
+  res.json({ success: true, data: rows });
 };
 
 // ── Finance settings (EMI etc. — values managed in Admin → Settings) ─────

@@ -18,6 +18,18 @@ export default function OrderDetail({ order, onClose }) {
   const queryClient = useQueryClient();
   const [editingItemId, setEditingItemId] = useState(null);
   const [finalPriceInput, setFinalPriceInput] = useState('');
+  const [downloading, setDownloading] = useState(false);
+ 
+  const handleInvoice = async () => {
+    setDownloading(true);
+    try {
+      await downloadInvoice(order.id);
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to generate invoice PDF.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const updateStatus = useMutation({
     mutationFn: ({ status }) =>
@@ -50,7 +62,12 @@ export default function OrderDetail({ order, onClose }) {
             <h3 className="font-display text-2xl text-forest">Order Details</h3>
             <p className="text-sm text-muted mt-1">#{order.id.slice(0, 8).toUpperCase()}</p>
           </div>
-          <StatusBadge status={order.status} />
+          <div className="flex items-center gap-3">
+            <Button type="button" secondary onClick={handleInvoice} disabled={downloading}>
+              {downloading ? 'Generating…' : '🧾 Generate Invoice PDF'}
+            </Button>
+            <StatusBadge status={order.status} />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 text-sm">

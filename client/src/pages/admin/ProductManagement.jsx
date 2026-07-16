@@ -18,7 +18,7 @@ export default function ProductManagement() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-products', page],
     queryFn: () =>
-      apiClient.get('/admin/products', { params: { page, limit: 10 } }).then(r => r.data),
+      apiClient.get('/admin/products', { params: { page, limit: 20 } }).then(r => r.data),
   });
 
 //   const createMutation = useMutation({
@@ -50,6 +50,30 @@ export default function ProductManagement() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-products'] }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id) => apiClient.delete(`/admin/products/${id}/permanent`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-products'] }),
+    onError: (err) => alert(err?.response?.data?.message || 'Failed to delete product.'),
+  });
+ 
+  const PAGE_LIMIT = 10;
+  const reorderMutation = useMutation({
+    mutationFn: ({ ids }) =>
+      apiClient.put('/admin/products/reorder', { ids, start: (page - 1) * PAGE_LIMIT }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['admin-products'] }),
+    onError: (err) => alert(err?.response?.data?.message || 'Failed to save order.'),
+  });
+ 
+  // Drag-and-drop: reorder the current page locally, show it immediately,
+  // then persist the new order.
+  const handleReorder = (fromIdx, toIdx) => {
+    const rows = [...(data?.data || [])];
+    const [moved] = rows.splice(fromIdx, 1);
+    rows.splice(toIdx, 0, moved);
+    queryClient.setQueryData(['admin-products', page], (old) => old ? { ...old, data: rows } : old);
+    reorderMutation.mutate({ ids: rows.map(r => r.id) });
+  };
+
   const columns = [
     { header: 'Name', accessor: 'name' },
     { header: 'Botanical', accessor: 'botanical_name' },
@@ -80,27 +104,40 @@ export default function ProductManagement() {
         <Button onClick={() => setModalOpen(true)}>+ Add Product</Button>
       </div>
 
+      <p className="text-xs text-muted mb-2">Drag the ⠿ handle to change the display order — it is saved automatically and reflected on the website.</p>
       <DataTable
         columns={columns}
         data={data?.data || []}
         onRowClick={handleEdit}
         isLoading={isLoading}
+        onReorder={handleReorder}
         actions={(row) => (
-          row.is_active ? (
+          <span className="flex gap-3 justify-end">
+            {row.is_active ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); if (window.confirm('Mark this product as not available? It loses the green "Available" badge on the site.')) archiveMutation.mutate(row.id); }}
+                className="text-amber-700 text-sm hover:underline"
+              >
+                Archive
+              </button>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); unarchiveMutation.mutate(row.id); }}
+                className="text-green-700 text-sm hover:underline"
+              >
+                Unarchive
+              </button>
+            )}
             <button
-              onClick={(e) => { e.stopPropagation(); if (window.confirm('Archive this product? It will be hidden from the public site.')) archiveMutation.mutate(row.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`Permanently DELETE "${row.name}"? This cannot be undone. Products used in orders cannot be deleted.`)) deleteMutation.mutate(row.id);
+              }}
               className="text-red-600 text-sm hover:underline"
             >
-              Archive
+              Delete
             </button>
-          ) : (
-            <button
-              onClick={(e) => { e.stopPropagation(); unarchiveMutation.mutate(row.id); }}
-              className="text-green-700 text-sm hover:underline"
-            >
-              Unarchive
-            </button>
-          )
+          </span>
         )}
       />
 
@@ -336,9 +373,21 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="active" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} />
-            <label htmlFor="active" className="text-sm">Available — shows the green "Available" badge on the public site</label>
+          <div className="col-span-2 flex items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.is_active}
+              onClick={() => setForm({ ...form, is_active: !form.is_active })}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors ${form.is_active ? 'bg-forest' : 'bg-gray-300'}`}
+            >
+              <span className={`inline-block h-5 w-5 mt-0.5 rounded-full bg-white shadow transform transition-transform ${form.is_active ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+            <span className="text-sm">
+              {form.is_active
+                ? <><b className="text-green-700">Active</b> — shows the green "Available" badge on the public site</>
+                : <><b className="text-gray-500">Inactive</b> — listed on the site without the "Available" badge</>}
+            </span>
           </div>
         </div>
         <div className="flex justify-end gap-3 pt-2">

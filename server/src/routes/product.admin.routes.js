@@ -8,7 +8,9 @@ router.use(authorize('super_admin', 'product_manager'));
 
 router.get('/', productController.getProducts);
 router.post('/', productController.createProduct);
+router.put('/reorder', productController.reorderProducts); // must be before /:id
 router.put('/:id', productController.updateProduct);
+router.delete('/:id/permanent', productController.deleteProductPermanent);
 router.delete('/:id', productController.deleteProduct);
 
 // Images

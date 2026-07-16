@@ -25,7 +25,8 @@ exports.getProducts = async (req, res, next) => {
     // The public page lists ALL products; is_active only controls the green
     // "Available" badge. Pass active_only=true to restrict to available ones.
     if (req.query.active_only === 'true') q = q.eq('is_active', true);
-    q = q.order('created_at', { ascending: false }).range(from, from + limit - 1);
+    // Admin drag-and-drop order first, newest as tiebreaker
+    q = q.order('sort_order', { ascending: true }).order('created_at', { ascending: false }).range(from, from + limit - 1);
  
     const { data, count, error } = await q;
     if (error) return next(new AppError(error.message, 500));
@@ -55,6 +56,10 @@ exports.createProduct = async (req, res, next) => {
     if (vErr) return next(new AppError(vErr.details[0].message, 400));
     const { category_ids, ...fields } = value;
     fields.slug = await uniqueSlug(fields.name);
+
+    // New products go to the end of the display order
+    const { data: last } = await supabase.from('products').select('sort_order').order('sort_order', { ascending: false }).limit(1);
+    fields.sort_order = last && last.length ? (last[0].sort_order || 0) + 1 : 1;
 
     const { data: product, error } = await supabase.from('products').insert(fields).select().single();
     if (error) return next(new AppError(error.message, 500));
@@ -89,6 +94,43 @@ exports.updateProduct = async (req, res, next) => {
     const action = old && old.is_active === false && data.is_active === true ? 'UNARCHIVE' : 'UPDATE';
     await auditLog({ user: req.user, action, entity_type: 'product', entity_id: data.id, old_values: old, new_values: data, ip_address: req.ip });
     res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// PUT /admin/products/reorder — body: { ids: [...], start: 0 }
+// Assigns sort_order = start + index for the given page of product ids.
+exports.reorderProducts = async (req, res, next) => {
+  try {
+    const { ids, start } = req.body;
+    if (!Array.isArray(ids) || !ids.length) {
+      return next(new AppError('Request body must contain a non-empty "ids" array.', 400));
+    }
+    const offset = Number.isInteger(start) && start >= 0 ? start : 0;
+    for (let i = 0; i < ids.length; i++) {
+      const { error } = await supabase.from('products').update({ sort_order: offset + i + 1 }).eq('id', ids[i]);
+      if (error) return next(new AppError(error.message, 500));
+    }
+    await auditLog({ user: req.user, action: 'UPDATE', entity_type: 'product', new_values: { reordered: ids.length, start: offset }, ip_address: req.ip });
+    res.json({ success: true, message: 'Order saved.' });
+  } catch (err) { next(err); }
+};
+ 
+// DELETE /admin/products/:id/permanent — hard delete (images cascade;
+// blocked by the DB if the product appears in any order)
+exports.deleteProductPermanent = async (req, res, next) => {
+  try {
+    const { data: old } = await supabase.from('products').select('*').eq('id', req.params.id).single();
+    if (!old) return next(new AppError('Product not found.', 404));
+ 
+    const { error } = await supabase.from('products').delete().eq('id', req.params.id);
+    if (error) {
+      if (error.code === '23503') {
+        return next(new AppError('Cannot delete: this product is used in one or more orders. Archive it instead to keep order history intact.', 409));
+      }
+      return next(new AppError(error.message, 500));
+    }
+    await auditLog({ user: req.user, action: 'DELETE', entity_type: 'product', entity_id: req.params.id, old_values: old, ip_address: req.ip });
+    res.json({ success: true, message: 'Product permanently deleted.' });
   } catch (err) { next(err); }
 };
 

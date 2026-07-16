@@ -34,6 +34,12 @@ export default function FinanceOS() {
    queryKey: ['farm-cash'],
    queryFn: () => apiClient.get('/admin/farm/cash').then(r => r.data.data),
   });
+  const { data: cashHistory } = useQuery({
+   queryKey: ['farm-cash-history'],
+   queryFn: () => apiClient.get('/admin/farm/cash/history').then(r => r.data.data),
+  });
+  const [showCashHistory, setShowCashHistory] = useState(false);
+  const [showRevForm, setShowRevForm] = useState(false);
   const { data: finSettings } = useQuery({
    queryKey: ['farm-finance-settings'],
    queryFn: () => apiClient.get('/admin/farm/finance-settings').then(r => r.data.data),
@@ -61,8 +67,12 @@ export default function FinanceOS() {
   });
   const updateCash = useMutation({
     mutationFn: (amount) => apiClient.put('/admin/farm/cash', { amount }),
-    // onSuccess: () => queryClient.invalidateQueries(['farm-cash']),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-cash'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['farm-cash'] });
+      queryClient.invalidateQueries({ queryKey: ['farm-cash-history'] });
+      setCashVal('');
+    },
+    onError: (err) => alert(err?.response?.data?.message || 'Failed to update cash position.'),
   });
   const deleteEntry = useMutation({
     mutationFn: (id) => apiClient.delete(`/admin/farm/expenses/${id}`),
@@ -113,11 +123,49 @@ export default function FinanceOS() {
 
       {/* Cash position */}
       <div className="bg-white p-4 rounded-lg border">
-        <h3 className="font-display text-lg mb-2">Cash Position</h3>
-        <div className="flex gap-2">
-          <Input type="number" placeholder="Total cash" value={cashVal} onChange={e => setCashVal(e.target.value)} />
-          <Button onClick={() => updateCash.mutate(cashVal)}>Update</Button>
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="font-display text-lg">Cash Position</h3>
+          {cashAmount > 0 && (
+            <span className="font-mono font-bold text-forest">₹{cashAmount.toLocaleString('en-IN')}</span>
+          )}
         </div>
+        <div className="flex gap-2">
+          <Input type="number" placeholder="New total cash on hand" value={cashVal} onChange={e => setCashVal(e.target.value)} />
+          <Button onClick={() => updateCash.mutate(cashVal)} disabled={updateCash.isPending || cashVal === ''}>
+            {updateCash.isPending ? 'Saving…' : 'Update'}
+          </Button>
+        </div>
+ 
+        {/* Update history — every change with timestamp, old → new, and user */}
+        {cashHistory?.length > 0 && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowCashHistory(!showCashHistory)}
+              className="text-xs text-sage hover:text-forest underline"
+            >
+              {showCashHistory ? 'Hide' : 'Show'} update history ({cashHistory.length})
+            </button>
+            {showCashHistory && (
+              <div className="mt-2 divide-y divide-border text-xs border border-border rounded-lg overflow-hidden">
+                {cashHistory.map(h => (
+                  <div key={h.id} className="flex items-center justify-between px-3 py-2 bg-cream/30">
+                    <span className="text-muted">
+                      {new Date(h.updated_at).toLocaleString('en-IN')}
+                      {h.user?.name ? ` · ${h.user.name}` : ''}
+                    </span>
+                    <span className="font-mono">
+                      {h.previous_amount != null && (
+                        <span className="text-muted line-through mr-2">₹{Number(h.previous_amount).toLocaleString('en-IN')}</span>
+                      )}
+                      <b className="text-forest">₹{Number(h.amount).toLocaleString('en-IN')}</b>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {cashAmount > 0 && emi > 0 && (
           <div className={`mt-3 p-3 rounded-lg ${
             cashAmount > emi*2 ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
@@ -136,7 +184,11 @@ export default function FinanceOS() {
             ₹{loggedRev.toLocaleString('en-IN')} logged + ₹{productSales.toLocaleString('en-IN')} product sales
             {finSummary?.orders_count ? ` (${finSummary.orders_count} orders)` : ''}
           </p>
-          <button onClick={() => document.getElementById('revSection').classList.toggle('hidden')} className="text-xs text-green-800 underline mt-1">+ Log</button>
+          <div className="mt-2">
+            <Button secondary onClick={() => setShowRevForm(v => !v)}>
+              {showRevForm ? 'Close' : '+ Log Revenue'}
+            </Button>
+          </div>
         </div>
         <div className="bg-white p-4 rounded-lg border text-center">
           <p className="text-xs uppercase tracking-wider text-orange-700">Expenses This Month</p>
@@ -145,15 +197,22 @@ export default function FinanceOS() {
       </div>
 
       {/* Revenue form */}
-      <div id="revSection" className="hidden bg-white p-4 rounded-lg border space-y-3">
-        <h4 className="font-display">Log Revenue</h4>
-        <div className="grid grid-cols-2 gap-3">
-          <Input type="number" placeholder="Amount" value={revForm.amount} onChange={e => setRevForm({...revForm, amount: e.target.value})} />
-          <Input type="date" value={revForm.date} onChange={e => setRevForm({...revForm, date: e.target.value})} />
+      {showRevForm && (
+        <div className="bg-white p-4 rounded-lg border space-y-3">
+          <h4 className="font-display">Log Revenue</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <Input type="number" placeholder="Amount" value={revForm.amount} onChange={e => setRevForm({...revForm, amount: e.target.value})} />
+            <Input type="date" value={revForm.date} onChange={e => setRevForm({...revForm, date: e.target.value})} />
+          </div>
+          <Input placeholder="Source / Buyer" value={revForm.note} onChange={e => setRevForm({...revForm, note: e.target.value})} />
+          <Button
+            disabled={addRevenue.isPending || !revForm.amount}
+            onClick={() => { addRevenue.mutate({ ...revForm, amount: parseFloat(revForm.amount) }); setShowRevForm(false); }}
+          >
+            {addRevenue.isPending ? 'Saving…' : 'Save Revenue'}
+          </Button>
         </div>
-        <Input placeholder="Source / Buyer" value={revForm.note} onChange={e => setRevForm({...revForm, note: e.target.value})} />
-        <Button onClick={() => addRevenue.mutate({ ...revForm, amount: parseFloat(revForm.amount) })}>Save Revenue</Button>
-      </div>
+      )}
 
       {/* Expense form */}
       <div className="bg-white p-4 rounded-lg border space-y-3">

@@ -1,91 +1,123 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../../services/api';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 
-const CROPS = [
-  { id: 'musli', name: 'Safed Musli', emoji: '🌿', acres: 4, color: '#162F22', light: '#EAF0EC',
-    harvest: 'Nov-Dec 2026', revenue: '₹20-40L',
-    risks: ['White grub at root zone', 'Root rot from waterlogging', 'Poor tuber set if soil compacted'],
-    weeks: { 4: 'Stand count + gap fill', 8: '1st weeding + N side-dress', 12: 'Tuber dev check', 16: 'Stop irrigation – harden', 20: 'Harvest' },
-  },
-  { id: 'moringa', name: 'Moringa', emoji: '🌱', acres: 6, color: '#4A7860', light: '#EAF0EC',
-    harvest: 'Year-round (leaf)', revenue: '₹15-30L',
-    risks: ['Pod fly in pods', 'Leaf spot in high humidity', 'Waterlogging kills young plants'],
-    weeks: { 4: 'Thinning + first prune', 8: 'Pinch tips for branching', 12: 'First leaf harvest', 16: 'Side-dress + irrigate', 20: 'Sustained leaf cuttings' },
-  },
-  { id: 'mucuna', name: 'Mucuna', emoji: '🫛', acres: 3, color: '#B8844A', light: '#F4ECE0',
-    harvest: 'Feb-Mar 2027', revenue: '₹8-15L',
-    risks: ['Pod shattering if late-harvested', 'Aphids on young vines', 'Needs trellis support'],
-    weeks: { 4: 'Provide staking/trellis', 8: 'Weeding + vine training', 12: 'Flowering check', 16: 'Pod fill monitoring', 20: 'Harvest mature pods' },
-  },
-  { id: 'ginger', name: 'Ginger', emoji: '🫚', acres: 2, color: '#6A9E7A', light: '#EAF0EC',
-    harvest: 'Dec-Jan 2027', revenue: '₹6-12L',
-    risks: ['Rhizome rot in poor drainage', 'Shoot borer', 'Sunscald without mulch'],
-    weeks: { 4: 'Mulch + first weeding', 8: 'Earthing up', 12: 'Rhizome bulking check', 16: 'Second earthing up', 20: 'Maturity check before harvest' },
-  },
+// Crops come from the Products list — nothing is hardcoded. Emoji/colour are
+// cosmetic, derived from the product name.
+const cropEmoji = (name = '') => {
+  const n = name.toLowerCase();
+  if (n.includes('ginger') || n.includes('turmeric')) return '🫚';
+  if (n.includes('moringa')) return '🌱';
+  if (n.includes('mucuna')) return '🫛';
+  if (n.includes('chia') || n.includes('seed')) return '🌾';
+  return '🌿';
+};
+const PALETTE = [
+  { color: '#162F22', light: '#EAF0EC' },
+  { color: '#4A7860', light: '#EAF0EC' },
+  { color: '#B8844A', light: '#F4ECE0' },
+  { color: '#6A9E7A', light: '#EAF0EC' },
+  { color: '#0891b2', light: '#E0F2FE' },
+  { color: '#7c3aed', light: '#EDE9FE' },
 ];
 
 function weeksFrom(d) { return !d ? 0 : Math.max(0, Math.floor((Date.now() - new Date(d)) / 604800000)); }
 
 export default function CropOS() {
   const queryClient = useQueryClient();
-  const [activeCrop, setActiveCrop] = useState('musli');
+  const [activeCrop, setActiveCrop] = useState(null);
   const [showObsModal, setShowObsModal] = useState(false);
+  const [areaDraft, setAreaDraft] = useState('');
+  const [editingArea, setEditingArea] = useState(false);
   const [obsForm, setObsForm] = useState({
     date: new Date().toISOString().slice(0,10), health: 'Good', pest: 'No', water: 'Good', growth: 'On track', note: ''
   });
 
-  // Fetch crop setups
-    const { data: setups } = useQuery({
-        queryKey: ['farm-crops'],
-        queryFn: () => apiClient.get('/admin/farm/crops').then(r => r.data.data),
-    });
-  // Fetch observations for active crop
-    const { data: observations } = useQuery({
-        queryKey: ['farm-obs', activeCrop],
-        queryFn: () => apiClient.get(`/admin/farm/crops/${activeCrop}/observations`).then(r => r.data.data),
-    });
+  // Crop list = active products (dynamic — every product added becomes a crop here)
+  const { data: cropOptions } = useQuery({
+    queryKey: ['farm-crop-options'],
+    queryFn: () => apiClient.get('/admin/farm/crop-options').then(r => r.data.data),
+  });
+ 
+  const { data: setups } = useQuery({
+    queryKey: ['farm-crops'],
+    queryFn: () => apiClient.get('/admin/farm/crops').then(r => r.data.data),
+  });
+ 
+  const crops = (cropOptions || []).map((p, i) => ({
+    id: p.slug,
+    name: p.name,
+    emoji: cropEmoji(p.name),
+    ...PALETTE[i % PALETTE.length],
+  }));
+ 
+  // Select the first crop once the list loads
+  useEffect(() => {
+    if (!activeCrop && crops.length) setActiveCrop(crops[0].id);
+  }, [crops, activeCrop]);
+ 
+  const { data: observations } = useQuery({
+    queryKey: ['farm-obs', activeCrop],
+    queryFn: () => apiClient.get(`/admin/farm/crops/${activeCrop}/observations`).then(r => r.data.data),
+    enabled: !!activeCrop,
+  });
 
   const setup = setups?.find(s => s.crop_id === activeCrop);
   const weeks = weeksFrom(setup?.planting_date);
-  const crop = CROPS.find(c => c.id === activeCrop);
-  const nextMilestone = Object.entries(crop.weeks).find(([w]) => parseInt(w) >= weeks);
+  const crop = crops.find(c => c.id === activeCrop);
 
-  // Mutations
   const saveSetup = useMutation({
     mutationFn: ({ cropId, data }) => apiClient.put(`/admin/farm/crops/${cropId}`, data),
-    // onSuccess: () => queryClient.invalidateQueries(['farm-crops']),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
+    onError: (err) => alert(err?.response?.data?.message || 'Failed to save crop setup.'),
+  });
+ 
+  const deleteCropEntry = useMutation({
+    mutationFn: (cropId) => apiClient.delete(`/admin/farm/crops/${cropId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
+    onError: (err) => alert(err?.response?.data?.message || 'Failed to delete crop entry.'),
   });
 
   const genPOP = useMutation({
     mutationFn: (cropId) => apiClient.post(`/admin/farm/crops/${cropId}/pop`),
-    // onSuccess: () => queryClient.invalidateQueries(['farm-crops']),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
+    onError: (err) => alert(err?.response?.data?.message || 'POP generation failed.'),
   });
 
   const addObservation = useMutation({
     mutationFn: (data) => apiClient.post(`/admin/farm/crops/${activeCrop}/observations`, data),
-    // onSuccess: () => queryClient.invalidateQueries(['farm-obs']),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-obs', activeCrop] }),
+    onError: (err) => alert(err?.response?.data?.message || 'Failed to log observation.'),
   });
+
+  if (crops.length === 0) {
+    return (
+      <div className="bg-white p-8 rounded-lg border text-center text-muted text-sm">
+        No crops yet. Crops are your <b>Products</b> — add a product in Admin → Products and it appears here automatically.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Crop tabs */}
+      {/* Crop tabs — from products, with live acreage from the DB */}
       <div className="flex gap-2 overflow-x-auto pb-2">
-        {CROPS.map(c => (
-          <button key={c.id} onClick={() => setActiveCrop(c.id)}
-            className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold border-2 transition ${
-              activeCrop === c.id ? 'border-current' : 'border-border text-muted'
-            }`}
-            style={activeCrop === c.id ? { borderColor: c.color, backgroundColor: c.light, color: c.color } : {}}
-          >
-            {c.emoji} {c.name.split(' ')[0]}<br/><span className="font-normal">{c.acres} ac</span>
-          </button>
-        ))}
+        {crops.map(c => {
+          const s = setups?.find(x => x.crop_id === c.id);
+          return (
+            <button key={c.id} onClick={() => { setActiveCrop(c.id); setEditingArea(false); }}
+              className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold border-2 transition ${
+                activeCrop === c.id ? 'border-current' : 'border-border text-muted'
+              }`}
+              style={activeCrop === c.id ? { borderColor: c.color, backgroundColor: c.light, color: c.color } : {}}
+            >
+              {c.emoji} {c.name.split(' ')[0]}<br/>
+              <span className="font-normal">{s?.area_acres != null ? `${Number(s.area_acres)} ac` : '— ac'}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Crop header */}
@@ -95,26 +127,65 @@ export default function CropOS() {
             <div>
               <span className="text-3xl">{crop.emoji}</span>
               <h3 className="text-xl font-bold mt-1">{crop.name}</h3>
-              <p className="text-xs opacity-80">{crop.acres} acres · Harvest: {crop.harvest} · {crop.revenue}</p>
+              <p className="text-xs opacity-80">
+                {setup?.area_acres != null ? `${Number(setup.area_acres)} acres cultivated` : 'Area not set'}
+                {setup?.planting_date ? ` · Planted ${new Date(setup.planting_date).toLocaleDateString('en-IN')}` : ''}
+              </p>
             </div>
             <div className="text-right">
               <div className="text-4xl font-mono font-bold">{weeks}</div>
               <div className="text-xs opacity-80">weeks in</div>
             </div>
           </div>
-          {nextMilestone && (
-            <div className="mt-3 bg-white/20 rounded-lg px-3 py-1 text-xs">
-              Next milestone Week {nextMilestone[0]}: {nextMilestone[1]}
-            </div>
-          )}
         </div>
       )}
 
+      {/* Area management — fully dynamic, stored in crop_setups.area_acres */}
+      <div className="bg-white p-5 rounded border border-border">
+        <div className="flex justify-between items-center">
+          <h3 className="font-display text-lg">Cultivated Area</h3>
+          {setup && (
+            <button
+              onClick={() => { if (confirm(`Delete the ${crop?.name} crop entry (area, planting date, generated POP)? Observations are kept.`)) deleteCropEntry.mutate(activeCrop); }}
+              className="text-red-600 text-xs hover:underline"
+            >
+              Delete crop entry
+            </button>
+          )}
+        </div>
+        {editingArea ? (
+          <div className="flex gap-2 mt-3">
+            <input
+              type="number" min="0" step="0.25"
+              value={areaDraft}
+              onChange={e => setAreaDraft(e.target.value)}
+              placeholder="Acres (e.g. 4)"
+              className="border rounded-sm p-2 flex-1"
+            />
+            <Button onClick={() => { saveSetup.mutate({ cropId: activeCrop, data: { area_acres: areaDraft === '' ? null : parseFloat(areaDraft) } }); setEditingArea(false); }}>
+              Save
+            </Button>
+            <Button secondary onClick={() => setEditingArea(false)}>Cancel</Button>
+          </div>
+        ) : (
+          <div className="flex justify-between items-center mt-3 text-sm">
+            <span>
+              {setup?.area_acres != null
+                ? <><strong className="text-lg font-mono">{Number(setup.area_acres)}</strong> acres</>
+                : <span className="text-muted">No area recorded for this crop.</span>}
+            </span>
+            <Button secondary onClick={() => { setAreaDraft(setup?.area_acres ?? ''); setEditingArea(true); }}>
+              ✎ {setup?.area_acres != null ? 'Edit area' : 'Set area'}
+            </Button>
+          </div>
+        )}
+      </div>
+ 
       {/* Planting date */}
       {!setup?.planting_date ? (
         <div className="bg-white p-5 rounded border border-border">
           <label className="block text-xs uppercase tracking-wider text-muted mb-2">Set Planting Date</label>
-          <input type="date" onChange={(e) => saveSetup.mutate({ cropId: activeCrop, data: { planting_date: e.target.value } })}
+          <input type="date" onChange={(e) => e.target.value && saveSetup.mutate({ cropId: activeCrop, data: { planting_date: e.target.value } })}
             className="border rounded-sm p-2 w-full" />
         </div>
       ) : (

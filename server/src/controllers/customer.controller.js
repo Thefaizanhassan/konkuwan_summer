@@ -14,6 +14,10 @@ exports.getAllCustomers = async (req, res, next) => {
     if (search) {
       q = q.or(`company_name.ilike.%${search}%,contact_person.ilike.%${search}%,email.ilike.%${search}%`);
     }
+    // Works together with search: ?lead_status=active_customer|potential_lead
+    if (req.query.lead_status && ['active_customer', 'potential_lead'].includes(req.query.lead_status)) {
+      q = q.eq('lead_status', req.query.lead_status);
+    }
     q = q.order('company_name', { ascending: true }).range(from, from + limit - 1);
 
     const { data, count, error } = await q;
@@ -27,6 +31,19 @@ exports.getAllCustomers = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /admin/customers/export — every customer, for CSV export
+exports.exportCustomers = async (req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('company_name, contact_person, email, phone, address, gstin, lead_status, linkedin_url, notes, created_at')
+      .order('company_name', { ascending: true });
+    if (error) return next(new AppError(error.message, 500));
+    await auditLog({ user: req.user, action: 'EXPORT', entity_type: 'customer', new_values: { exported: (data || []).length }, ip_address: req.ip });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+ 
 exports.getCustomerById = async (req, res, next) => {
   try {
     const { data, error } = await supabase.from('customers').select('*').eq('id', req.params.id).single();
@@ -65,7 +82,14 @@ exports.deleteCustomer = async (req, res, next) => {
   try {
     const { data: old } = await supabase.from('customers').select('*').eq('id', req.params.id).single();
     const { error } = await supabase.from('customers').delete().eq('id', req.params.id);
-    if (error) return next(new AppError(error.message, 500));
+    if (error) {
+      // orders.customer_id is ON DELETE RESTRICT — deleting a customer with
+      // orders violates that FK. Explain instead of a generic 500.
+      if (error.code === '23503') {
+        return next(new AppError('Cannot delete: this customer has orders. Cancel/delete their orders first, or keep the customer for record-keeping.', 409));
+      }
+      return next(new AppError(error.message, 500));
+    }
     await auditLog({ user: req.user, action: 'DELETE', entity_type: 'customer', entity_id: req.params.id, old_values: old, ip_address: req.ip });
     res.json({ success: true, message: 'Customer deleted.' });
   } catch (err) { next(err); }

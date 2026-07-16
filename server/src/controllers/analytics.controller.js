@@ -59,6 +59,47 @@ exports.getDashboardStats = async (req, res, next) => {
     });
     const top_products = Object.values(prodMap).sort((a, b) => b.total_quantity - a.total_quantity).slice(0, 5);
 
+    // ── Operational overview: products, inquiries, farmers, farm finance ──
+    const startOfMonth = ymd(somThis);
+    const [
+      { count: productsTotal }, { count: productsActive },
+      { count: inquiriesNew }, { count: inquiriesTotal },
+      { data: farmerRows },
+      { data: monthExp },
+      { count: leadsPotential },
+      { data: allOrderStatuses },
+      { data: cropSetups },
+      { data: recentAudit },
+    ] = await Promise.all([
+      supabase.from('products').select('id', { count: 'exact', head: true }),
+      supabase.from('products').select('id', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from('contact_submissions').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+      supabase.from('contact_submissions').select('id', { count: 'exact', head: true }),
+      supabase.from('farmers').select('id, area_decimal, farmer_type, farmer_visits(date)'),
+      supabase.from('expenses').select('type, amount').gte('date', startOfMonth),
+      supabase.from('customers').select('id', { count: 'exact', head: true }).eq('lead_status', 'potential_lead'),
+      supabase.from('orders').select('status'),
+      supabase.from('crop_setups').select('crop_id, area_acres, planting_date'),
+      supabase.from('audit_logs').select('action, entity_type, created_at, user:profiles(name)').order('created_at', { ascending: false }).limit(8),
+    ]);
+ 
+    const farmersTotal = (farmerRows || []).length;
+    const farmArea = (farmerRows || []).reduce((s, f) => s + Number(f.area_decimal || 0), 0);
+    const twoWeeksAgo = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+    const farmersNeedingVisit = (farmerRows || []).filter(f => {
+      const visits = f.farmer_visits || [];
+      if (!visits.length) return true;
+      return !visits.some(v => v.date >= twoWeeksAgo);
+    }).length;
+ 
+    const expensesMTD = (monthExp || []).filter(e => e.type === 'expense').reduce((s, e) => s + Number(e.amount || 0), 0);
+    const loggedRevenueMTD = (monthExp || []).filter(e => e.type === 'revenue').reduce((s, e) => s + Number(e.amount || 0), 0);
+ 
+    const statusDist = {};
+    (allOrderStatuses || []).forEach(o => { statusDist[o.status] = (statusDist[o.status] || 0) + 1; });
+ 
+    const cultivatedAcres = (cropSetups || []).reduce((s, c) => s + Number(c.area_acres || 0), 0);
+
     res.json({
       success: true,
       data: {
@@ -70,6 +111,23 @@ exports.getDashboardStats = async (req, res, next) => {
           orders_trend: pct(ordersMTD, ordersPrev),
           customers_trend: pct(totalCustomers || 0, custBeforeThis || 0),
         },
+        overview: {
+          products_total: productsTotal || 0,
+          products_active: productsActive || 0,
+          inquiries_new: inquiriesNew || 0,
+          inquiries_total: inquiriesTotal || 0,
+          potential_leads: leadsPotential || 0,
+          farmers_total: farmersTotal,
+          farmers_needing_visit: farmersNeedingVisit,
+          farm_area_decimal: farmArea,
+          cultivated_acres: cultivatedAcres,
+          crops_tracked: (cropSetups || []).length,
+          expenses_mtd: expensesMTD,
+          farm_revenue_logged_mtd: loggedRevenueMTD,
+          draft_orders: statusDist.draft || 0,
+        },
+        order_status_distribution: Object.entries(statusDist).map(([status, count]) => ({ status, count })),
+        recent_activity: recentAudit || [],
         recent_orders,
         top_products,
         revenue_chart,

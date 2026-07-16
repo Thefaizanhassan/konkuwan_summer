@@ -84,6 +84,9 @@ export default function Dashboard() {
   const PALETTE = ['#162F22', '#4A7860', '#6A9E7A', '#B8844A', '#C8A84B', '#8FA98F', '#D9CDB8', '#3B5747'];
 
   const kpi = data?.data?.kpi || {};
+  const overview = data?.data?.overview || {};
+  const statusDist = data?.data?.order_status_distribution || [];
+  const recentActivity = data?.data?.recent_activity || [];
   const recentOrders = data?.data?.recent_orders || [];
   const topProducts = data?.data?.top_products || [];
   const revenueChart = (data?.data?.revenue_chart || []).map(d => ({
@@ -145,6 +148,45 @@ export default function Dashboard() {
           trend={fmtTrend(kpi.customers_trend)} trendUp={(kpi.customers_trend ?? 0) >= 0}
         />
       </div>
+
+      {/* Operational overview */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        {[
+          { label: 'Products', value: `${overview.products_active ?? 0}/${overview.products_total ?? 0}`, sub: 'available / total', to: '/admin/products' },
+          { label: 'Potential Leads', value: overview.potential_leads ?? 0, sub: 'customers pipeline', to: '/admin/customers' },
+          { label: 'New Inquiries', value: overview.inquiries_new ?? 0, sub: `${overview.inquiries_total ?? 0} total`, to: '/admin/inquiries', alert: (overview.inquiries_new ?? 0) > 0 },
+          { label: 'Farmers', value: overview.farmers_total ?? 0, sub: `${Number(overview.farm_area_decimal || 0).toFixed(0)} dec enrolled`, to: '/admin/farm' },
+          { label: 'Cultivated', value: `${Number(overview.cultivated_acres || 0)} ac`, sub: `${overview.crops_tracked ?? 0} crops tracked`, to: '/admin/farm' },
+          { label: 'Farm Expenses (MTD)', value: `₹${Number(overview.expenses_mtd || 0).toLocaleString('en-IN')}`, sub: `₹${Number(overview.farm_revenue_logged_mtd || 0).toLocaleString('en-IN')} farm revenue`, to: '/admin/farm' },
+        ].map(card => (
+          <Link key={card.label} to={card.to}
+            className="rounded-2xl p-4 block hover:shadow-md transition"
+            style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)', border: card.alert ? '1px solid #f3d9a4' : '1px solid rgba(0,0,0,0.02)' }}
+          >
+            <p className="text-xs font-medium" style={{ color: '#6a7a63' }}>{card.label}</p>
+            <p className="text-xl font-bold mt-1" style={{ color: card.alert ? '#92400e' : '#1c2e1f' }}>{card.value}</p>
+            <p className="text-[11px] mt-0.5" style={{ color: '#9aa694' }}>{card.sub}</p>
+          </Link>
+        ))}
+      </div>
+ 
+      {/* Needs attention */}
+      {((overview.inquiries_new ?? 0) > 0 || (overview.draft_orders ?? 0) > 0 || (overview.farmers_needing_visit ?? 0) > 0) && (
+        <div className="rounded-2xl p-5 mb-8" style={{ background: '#FFF8EC', border: '1px solid #f3d9a4' }}>
+          <h3 className="font-display text-lg mb-2" style={{ color: '#7c4a03' }}>⚠ Needs attention</h3>
+          <ul className="text-sm space-y-1" style={{ color: '#7c4a03' }}>
+            {(overview.inquiries_new ?? 0) > 0 && (
+              <li><Link to="/admin/inquiries" className="underline">{overview.inquiries_new} new inquir{overview.inquiries_new === 1 ? 'y' : 'ies'}</Link> waiting for a reply</li>
+            )}
+            {(overview.draft_orders ?? 0) > 0 && (
+              <li><Link to="/admin/orders" className="underline">{overview.draft_orders} draft order{overview.draft_orders === 1 ? '' : 's'}</Link> not yet confirmed</li>
+            )}
+            {(overview.farmers_needing_visit ?? 0) > 0 && (
+              <li><Link to="/admin/farm" className="underline">{overview.farmers_needing_visit} farmer{overview.farmers_needing_visit === 1 ? '' : 's'}</Link> not visited in 2+ weeks</li>
+            )}
+          </ul>
+        </div>
+      )}
 
       {/* Chart + Top Products */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-7 mb-8">
@@ -271,6 +313,61 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Order pipeline + Recent activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 mb-8">
+        <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
+          <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>Order Pipeline</h3>
+          {statusDist.length === 0 ? (
+            <p className="text-sm text-muted text-center py-8">No orders yet</p>
+          ) : (
+            <div style={{ height: 240 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={statusDist} dataKey="count" nameKey="status" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                    {statusDist.map((s, i) => (
+                      <Cell key={i} fill={{ delivered: '#2a5e3a', confirmed: '#1c5a7a', dispatched: '#b8860b', draft: '#8a8a7a', cancelled: '#a33' }[s.status] || PALETTE[i % PALETTE.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v, n) => [v, n]} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12, textTransform: 'capitalize' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+ 
+        <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>Recent Activity</h3>
+            <Link to="/admin/audit-logs" className="text-sm font-medium" style={{ color: '#4a6a4f', borderBottom: '1px dashed #b7cbb0' }}>
+              All logs →
+            </Link>
+          </div>
+          {recentActivity.length === 0 ? (
+            <p className="text-sm text-muted text-center py-8">No activity recorded yet</p>
+          ) : (
+            <ul className="divide-y" style={{ borderColor: '#f0ebe2' }}>
+              {recentActivity.map((a, i) => (
+                <li key={i} className="py-2 flex items-center justify-between text-sm">
+                  <span>
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium mr-2 ${
+                      a.action === 'CREATE' ? 'bg-green-100 text-green-700'
+                      : a.action === 'DELETE' || a.action === 'DEACTIVATE' ? 'bg-red-100 text-red-700'
+                      : 'bg-blue-100 text-blue-700'
+                    }`}>{a.action}</span>
+                    <span className="capitalize">{a.entity_type}</span>
+                    {a.user?.name && <span className="text-muted"> · {a.user.name}</span>}
+                  </span>
+                  <span className="text-xs text-muted whitespace-nowrap">
+                    {new Date(a.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+ 
       {/* Recent Orders */}
       <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
         <div className="flex items-center justify-between mb-5">

@@ -19,16 +19,42 @@ export default function CustomerManagement() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [leadFilter, setLeadFilter] = useState('');
+  const [exporting, setExporting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['customers', page, search],
-    queryFn: () => customerApi.list({ page, limit: 10, search }),
+    queryKey: ['customers', page, search, leadFilter],
+    queryFn: () => customerApi.list({ page, limit: 20, search, lead_status: leadFilter || undefined }),
     keepPreviousData: true,
   });
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const { data: res } = await apiClient.get('/admin/customers/export');
+      const rows = res.data || [];
+      if (!rows.length) return alert('No customers to export.');
+      const csv = Papa.unparse(rows.map(r => ({
+        ...r,
+        created_at: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : '',
+      })));
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `konkuwan-customers-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
+  };
+ 
   const createMutation = useMutation({
     mutationFn: customerApi.create,
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['customers'] }); setModalOpen(false); },
@@ -40,6 +66,9 @@ export default function CustomerManagement() {
   const deleteMutation = useMutation({
     mutationFn: customerApi.delete,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] }),
+    // Without this the delete failed silently (e.g. customer has orders —
+    // the DB blocks the delete). Now the reason is shown.
+    onError: (err) => alert(err?.response?.data?.message || 'Failed to delete customer.'),
   });
 
   const columns = [
@@ -84,16 +113,28 @@ export default function CustomerManagement() {
         <h2 className="font-display text-3xl text-forest">Customers</h2>
         {/* <Button onClick={() => { setEditingCustomer(null); setModalOpen(true); }}>Add Customer</Button> */}
         <div className="flex gap-3">
+          <Button secondary onClick={handleExport} disabled={exporting}>{exporting ? 'Exporting…' : '⬇ Export CSV'}</Button>
           <Button secondary onClick={() => setImportOpen(true)}>⬆ Import CSV</Button>
           <Button onClick={() => { setEditingCustomer(null); setModalOpen(true); }}>Add Customer</Button>
         </div>
       </div>
-      <div className="mb-4">
-        <Input
-          placeholder="Search by company, contact, email..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        />
+      <div className="mb-4 flex gap-3 flex-wrap">
+        <div className="flex-1 min-w-[220px]">
+          <Input
+            placeholder="Search by company, contact, email..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
+        </div>
+        <select
+          value={leadFilter}
+          onChange={(e) => { setLeadFilter(e.target.value); setPage(1); }}
+          className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
+        >
+          <option value="">All Customers</option>
+          <option value="active_customer">Active Customers</option>
+          <option value="potential_lead">Potential Leads</option>
+        </select>
       </div>
       <DataTable
         columns={columns}

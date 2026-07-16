@@ -7,6 +7,7 @@ router.use(authorize('super_admin', 'farm_manager'));
 
 router.get('/crops', farmController.getCrops);
 router.put('/crops/:cropId', farmController.updateCrop);
+router.delete('/crops/:cropId', farmController.deleteCrop);
 router.post('/crops/:cropId/pop', farmController.generatePOP);
 router.get('/crops/:cropId/observations', farmController.getObservations);
 router.post('/crops/:cropId/observations', farmController.addObservation);
@@ -18,6 +19,7 @@ router.post('/farmers', farmController.addFarmer);
 router.delete('/farmers/:id', farmController.deleteFarmer);
 router.post('/farmers/:id/visits', farmController.addVisit);
 router.get('/cash', farmController.getCash);
+router.get('/cash/history', farmController.getCashHistory);
 router.put('/cash', farmController.updateCash);
 router.get('/finance-settings', farmController.getFinanceSettings);
 router.get('/finance-summary', farmController.getFinanceSummary);

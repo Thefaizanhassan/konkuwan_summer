@@ -1,4 +1,11 @@
-export default function DataTable({ columns, data, onRowClick, actions, isLoading }) {
+import { useState } from 'react';
+ 
+// Pass onReorder(fromIndex, toIndex) to enable drag-and-drop row reordering —
+// a ⠿ handle column appears and rows become draggable.
+export default function DataTable({ columns, data, onRowClick, actions, isLoading, onReorder }) {
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+
   if (isLoading) {
     return (
       <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
@@ -23,6 +30,7 @@ export default function DataTable({ columns, data, onRowClick, actions, isLoadin
         <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #ece6dc' }}>
+              {onReorder && <th style={{ width: 36, background: '#faf8f4' }} />}
               {columns.map(col => (
                 <th
                   key={col.header}
@@ -45,14 +53,36 @@ export default function DataTable({ columns, data, onRowClick, actions, isLoadin
                 key={row.id || idx}
                 onClick={() => onRowClick && onRowClick(row)}
                 className="transition-colors"
+                draggable={!!onReorder}
+                onDragStart={onReorder ? () => setDragIdx(idx) : undefined}
+                onDragOver={onReorder ? (e) => { e.preventDefault(); setOverIdx(idx); } : undefined}
+                onDragLeave={onReorder ? () => setOverIdx(o => (o === idx ? null : o)) : undefined}
+                onDrop={onReorder ? () => {
+                  if (dragIdx != null && dragIdx !== idx) onReorder(dragIdx, idx);
+                  setDragIdx(null); setOverIdx(null);
+                } : undefined}
+                onDragEnd={onReorder ? () => { setDragIdx(null); setOverIdx(null); } : undefined}
                 style={{
                   borderBottom: idx < data.length - 1 ? '1px solid #f1ebe2' : 'none',
-                  background: idx % 2 === 1 ? '#faf8f4' : '#fff',
+                  background: overIdx === idx && dragIdx !== null && dragIdx !== idx
+                    ? '#e8f0e6'
+                    : idx % 2 === 1 ? '#faf8f4' : '#fff',
                   cursor: onRowClick ? 'pointer' : 'default',
+                  opacity: dragIdx === idx ? 0.5 : 1,
                 }}
                 onMouseEnter={e => { if (onRowClick) e.currentTarget.style.background = '#f4f0e8'; }}
                 onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 1 ? '#faf8f4' : '#fff'}
               >
+                {onReorder && (
+                  <td
+                    className="px-2 py-3.5 text-center select-none"
+                    style={{ cursor: 'grab', color: '#a8a294' }}
+                    onClick={e => e.stopPropagation()}
+                    title="Drag to reorder"
+                  >
+                    ⠿
+                  </td>
+                )}
                 {columns.map(col => (
                   <td key={col.header} className="px-5 py-3.5" style={{ color: '#1f2e1c' }}>
                     {col.render
