@@ -291,3 +291,99 @@ export async function downloadQuotation(orderId) {
   drawFooterNote(doc, pageW, { company_email: q.company.email, company_phone: q.company.phone });
   doc.save(`${q.quotation_number.replace(/\//g, '-')}.pdf`);
 }
+ 
+// ── DELIVERY CHALLAN ─────────────────────────────────────────────────────
+// Records a purchase FROM a farmer, so the parties are reversed vs an
+// invoice: the company receives, the farmer supplies.
+export async function downloadChallan(challanId) {
+  const { data } = await apiClient.get(`/admin/challans/${challanId}/print`);
+  const c = data.data;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const logo = await logoAsPng();
+ 
+  drawHeader(doc, pageW, {
+    title: 'Delivery Challan',
+    numberLabel: 'Challan No #', numberValue: c.challan_number,
+    dateLabel: 'Challan Date', dateValue: new Date(c.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+  }, logo);
+ 
+  const partiesBottom = drawParties(
+    doc, pageW,
+    'Received By', c.company,
+    'Supplied By (Farmer)', {
+      name: c.farmer.name,
+      address: c.farmer.village,
+      phone: c.farmer.phone,
+    },
+    135
+  );
+ 
+  autoTable(doc, {
+    startY: partiesBottom + 18,
+    head: [['#', 'Product / Crop', 'Quantity', 'Purchase Rate', 'Amount']],
+    body: c.items.map((it, i) => [
+      String(i + 1),
+      it.product,
+      `${it.quantity} ${it.unit}`,
+      inr(it.purchase_rate),
+      inr(it.line_total),
+    ]),
+    styles: { fontSize: 9.5, cellPadding: 7, textColor: [40, 40, 40] },
+    headStyles: { fillColor: HEAD, textColor: 255 },
+    alternateRowStyles: { fillColor: [248, 245, 238] },
+    columnStyles: { 0: { cellWidth: 24 }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+  });
+ 
+  let y = doc.lastAutoTable.finalY + 20;
+ 
+  doc.setFont('helvetica', 'bold').setFontSize(9.5).setTextColor(40);
+  doc.text(`Total (in words): ${numberToWords(c.total_value)} RUPEES ONLY`, 40, y + 4, { maxWidth: pageW / 2 - 40 });
+ 
+  const bx = pageW - 300, bw = 260;
+  const rows = [
+    ['Goods Value', inr(c.goods_value)],
+    ['Challan Charges', inr(c.challan_charges)],
+  ];
+  doc.setFontSize(10).setTextColor(60);
+  rows.forEach((r, i) => {
+    doc.setFont('helvetica', 'bold').text(r[0], bx, y + i * 18);
+    doc.setFont('helvetica', 'normal').text(r[1], bx + bw, y + i * 18, { align: 'right' });
+  });
+  const ty = y + rows.length * 18 + 4;
+  doc.setDrawColor(180).line(bx, ty - 2, bx + bw, ty - 2);
+  doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(...FOREST);
+  doc.text('Total Purchase Value', bx, ty + 12);
+  doc.text(inr(c.total_value), bx + bw, ty + 12, { align: 'right' });
+ 
+  y = ty + 44;
+  doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(90);
+  doc.text('Challan charges cover crop pickup, transportation to warehouse, loading/unloading and other procurement costs.', 40, y, { maxWidth: pageW - 80 });
+ 
+  if (c.notes) {
+    y += 22;
+    doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...FOREST);
+    doc.text('Notes', 40, y);
+    doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(60);
+    doc.text(String(c.notes), 40, y + 14, { maxWidth: pageW - 80 });
+    y += 30;
+  }
+ 
+  // Signature lines — a challan is physically signed on handover
+  y += 40;
+  doc.setDrawColor(150);
+  doc.line(40, y, 200, y);
+  doc.line(pageW - 200, y, pageW - 40, y);
+  doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(90);
+  doc.text('Farmer / Supplier Signature', 40, y + 14);
+  doc.text('Authorised Signatory', pageW - 200, y + 14);
+ 
+  // Challan-specific footer (it IS signed, so no "no signature required" note)
+  const pageH = doc.internal.pageSize.getHeight();
+  doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(70);
+  doc.text(
+    `For any enquiry, reach out via email at ${c.company.email || 'info@konkuwanherbs.com'}, call on ${c.company.phone || '+91 80106 05859'}`,
+    pageW / 2, pageH - 50, { align: 'center' }
+  );
+  doc.save(`${c.challan_number.replace(/\//g, '-')}.pdf`);
+}

@@ -4,8 +4,8 @@ const auditLog = require('../utils/audit');
 const { createChallanSchema } = require('../validations/challan.validation');
  
 const CHALLAN_SELECT =
-  '*, farmer:farmers(id,name,village), items:challan_items(*, product:products(id,name,unit)), creator:profiles(name)';
- 
+  '*, farmer:farmers(id,name,village,phone), items:challan_items(*, product:products(id,name,unit)), creator:profiles(name)';
+
 function financialYear(dateStr) {
   const d = new Date(dateStr);
   const y = d.getFullYear();
@@ -99,7 +99,56 @@ exports.createChallan = async (req, res, next) => {
     res.status(201).json({ success: true, data: full });
   } catch (err) { next(err); }
 };
+
+// GET /admin/challans/:id/print — challan + company details for the PDF
+exports.printChallan = async (req, res, next) => {
+  try {
+    const { data: challan, error } = await supabase
+      .from('delivery_challans').select(CHALLAN_SELECT).eq('id', req.params.id).single();
+    if (error || !challan) return next(new AppError('Challan not found.', 404));
  
+    const keys = ['company_name', 'company_address', 'company_gstin', 'company_pan', 'company_email', 'company_phone'];
+    const { data: rows } = await supabase.from('settings').select('key,value').in('key', keys);
+    const s = {};
+    (rows || []).forEach((r) => { s[r.key] = r.value; });
+ 
+    res.json({
+      success: true,
+      data: {
+        doc_type: 'challan',
+        title: 'Delivery Challan',
+        challan_number: challan.challan_number,
+        date: challan.challan_date,
+        company: {
+          name: s.company_name || 'Konkuwan Herbs Pvt. Ltd.',
+          address: s.company_address || 'Baselisahi, Westgate, Puri, Odisha, India - 752001',
+          gstin: s.company_gstin || '',
+          pan: s.company_pan || '',
+          email: s.company_email || 'info@konkuwanherbs.com',
+          phone: s.company_phone || '',
+        },
+        farmer: {
+          name: challan.farmer?.name || challan.farmer_name || '—',
+          village: challan.farmer?.village || '',
+          phone: challan.farmer?.phone || '',
+        },
+        items: (challan.items || []).map((it) => ({
+          product: it.product?.name || it.product_name || '—',
+          quantity: Number(it.quantity),
+          unit: it.unit,
+          purchase_rate: Number(it.purchase_rate),
+          line_total: Number(it.line_total),
+        })),
+        goods_value: Number(challan.goods_value || 0),
+        challan_charges: Number(challan.challan_charges || 0),
+        total_value: Number(challan.total_value || 0),
+        notes: challan.notes || null,
+        created_by: challan.creator?.name || null,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
 exports.deleteChallan = async (req, res, next) => {
   try {
     const { data: old } = await supabase.from('delivery_challans').select('*').eq('id', req.params.id).single();

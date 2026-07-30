@@ -1,6 +1,8 @@
 // const { createClient } = require('@supabase/supabase-js');
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
+const auditLog = require('../utils/audit');
+const { createFarmerSchema } = require('../validations/farmer.validation');
 
 // const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 // ── AI provider (switchable: Claude / OpenAI) ────────────────────────────
@@ -206,6 +208,55 @@ exports.addFarmer = async (req, res, next) => {
     .single();
   if (error) return next(new AppError(error.message, 500));
   res.status(201).json({ success: true, data });
+};
+
+// GET /admin/farm/farmers/export — all farmers, for CSV export
+// (mirrors the Customers module).
+exports.exportFarmers = async (req, res, next) => {
+  const { data, error } = await supabase
+    .from('farmers')
+    .select('name, phone, village, block, crop, area_decimal, seed_date, farmer_type, created_at')
+    .order('name', { ascending: true });
+  if (error) return next(new AppError(error.message, 500));
+  await auditLog({ user: req.user, action: 'EXPORT', entity_type: 'farmer', new_values: { exported: (data || []).length }, ip_address: req.ip });
+  res.json({ success: true, data });
+};
+ 
+// POST /admin/farm/farmers/import — bulk CSV import, same contract and
+// duplicate handling as the Customers import.
+exports.importFarmers = async (req, res, next) => {
+  try {
+    const { farmers } = req.body;
+    if (!Array.isArray(farmers) || farmers.length === 0)
+      return next(new AppError('Request body must contain a non-empty "farmers" array.', 400));
+    if (farmers.length > 1000) return next(new AppError('Maximum 1000 farmers per import.', 400));
+ 
+    const summary = { imported: 0, skipped: 0, errors: [] };
+    for (let i = 0; i < farmers.length; i++) {
+      const { error: vErr, value } = createFarmerSchema.validate(farmers[i], { stripUnknown: true });
+      if (vErr) { summary.skipped++; summary.errors.push({ row: i + 1, name: farmers[i].name || '—', reason: vErr.details[0].message }); continue; }
+ 
+      // Duplicate = same name in the same village (or same phone)
+      let dupQuery = supabase.from('farmers').select('id');
+      if (value.phone) {
+        dupQuery = dupQuery.or(`phone.eq.${value.phone},and(name.ilike.${value.name},village.ilike.${value.village || ''})`);
+      } else {
+        dupQuery = dupQuery.ilike('name', value.name).ilike('village', value.village || '');
+      }
+      const { data: dup } = await dupQuery.limit(1);
+      if (dup && dup.length) { summary.skipped++; summary.errors.push({ row: i + 1, name: value.name, reason: 'Duplicate (same phone, or same name in same village)' }); continue; }
+ 
+      const { error } = await supabase.from('farmers').insert({
+        ...value,
+        seed_date: value.seed_date ? new Date(value.seed_date).toISOString().slice(0, 10) : null,
+        enrolled_by: req.user.id,
+      });
+      if (error) { summary.skipped++; summary.errors.push({ row: i + 1, name: value.name, reason: error.message }); continue; }
+      summary.imported++;
+    }
+    await auditLog({ user: req.user, action: 'IMPORT', entity_type: 'farmer', new_values: { imported: summary.imported, skipped: summary.skipped }, ip_address: req.ip });
+    res.status(201).json({ success: true, data: summary });
+  } catch (err) { next(err); }
 };
 
 exports.deleteFarmer = async (req, res, next) => {

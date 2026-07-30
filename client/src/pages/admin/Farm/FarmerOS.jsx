@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../../services/api';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
+import Modal from '../../../components/ui/Modal';
+import Papa from 'papaparse';
 
 // Emoji + colour are cosmetic — derived from the product name.
 const cropEmoji = (name = '') => {
@@ -29,8 +31,12 @@ export default function FarmerOS() {
   const [editingTargets, setEditingTargets] = useState(false);
   const [targetDraft, setTargetDraft] = useState({});
   const [farmForm, setFarmForm] = useState({
-
+    name: '', village: '', block: '', crop: '', area_decimal: '',
+    seed_date: new Date().toISOString().slice(0, 10), phone: '',
+    farmer_type: 'connected', by: 'CRP',
   });
+  const [importOpen, setImportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [visitForm, setVisitForm] = useState({ date: new Date().toISOString().slice(0,10), status: 'Good', note: '' });
   const [visitTarget, setVisitTarget] = useState(null);
 
@@ -89,6 +95,31 @@ export default function FarmerOS() {
       .some(v => (v || '').toLowerCase().includes(q))
   );
   const filteredFarmers = filter === 'all' ? searched : searched?.filter(f => f.crop === filter);
+
+  // CSV export — same behaviour/format as the Customers module
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const { data: res } = await apiClient.get('/admin/farm/farmers/export');
+      const rows = res.data || [];
+      if (!rows.length) return alert('No farmers to export.');
+      const csv = Papa.unparse(rows.map(r => ({
+        ...r,
+        created_at: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : '',
+      })));
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `konkuwan-farmers-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const startEditTargets = () => {
     const draft = {};
@@ -266,9 +297,13 @@ export default function FarmerOS() {
 
       {/* Enroll form */}
       <div className="bg-white p-4 rounded-lg border">
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
           <h3 className="font-display text-lg">Enroll Farmer</h3>
-          <Button secondary onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : '+ Add'}</Button>
+          <div className="flex gap-2">
+            <Button secondary onClick={handleExport} disabled={exporting}>{exporting ? 'Exporting…' : '⬇ Export CSV'}</Button>
+            <Button secondary onClick={() => setImportOpen(true)}>⬆ Import CSV</Button>
+            <Button secondary onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : '+ Add'}</Button>
+          </div>
         </div>
         {showForm && (
           <form
@@ -366,6 +401,104 @@ export default function FarmerOS() {
           </button>
         );
       })}
+ 
+      {importOpen && (
+        <ImportFarmersModal
+          onClose={() => setImportOpen(false)}
+          onDone={() => queryClient.invalidateQueries({ queryKey: ['farm-farmers'] })}
+        />
+      )}
     </div>
+  );
+}
+ 
+// Bulk CSV import — same UX and contract as the Customers import.
+// Accepted headers (case-insensitive): name, phone, village, block, crop,
+// area_decimal, seed_date, farmer_type
+function ImportFarmersModal({ onClose, onDone }) {
+  const [rows, setRows] = useState([]);
+  const [parseErrors, setParseErrors] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [busy, setBusy] = useState(false);
+ 
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: h => h.trim().toLowerCase().replace(/\s+/g, '_'),
+      complete: ({ data, errors }) => {
+        setParseErrors(errors.map(er => `Row ${er.row + 1}: ${er.message}`));
+        setRows(data.filter(r => Object.values(r).some(v => String(v || '').trim() !== '')));
+        setSummary(null);
+      },
+    });
+  };
+ 
+  const runImport = async () => {
+    setBusy(true);
+    try {
+      const payload = rows.map(r => ({
+        name: r.name?.trim(),
+        phone: r.phone || null,
+        village: r.village || null,
+        block: r.block || null,
+        crop: r.crop || null,
+        area_decimal: r.area_decimal ? parseFloat(r.area_decimal) : null,
+        seed_date: r.seed_date || null,
+        farmer_type: ['connected', 'independent'].includes((r.farmer_type || '').toLowerCase())
+          ? r.farmer_type.toLowerCase() : 'connected',
+      }));
+      const { data } = await apiClient.post('/admin/farm/farmers/import', { farmers: payload });
+      setSummary(data.data);
+      onDone();
+    } catch (err) {
+      setSummary({ imported: 0, skipped: rows.length, errors: [{ row: '—', reason: err?.response?.data?.message || 'Import failed' }] });
+    } finally {
+      setBusy(false);
+    }
+  };
+ 
+  return (
+    <Modal onClose={onClose}>
+      <div className="space-y-4">
+        <h3 className="font-display text-xl text-forest">Import Farmers (CSV)</h3>
+        <p className="text-xs text-muted">
+          Required column: <code>name</code>. Optional: phone, village, block, crop
+          (use the product slug, e.g. <code>moringa</code>), area_decimal, seed_date
+          (YYYY-MM-DD), farmer_type (connected / independent).
+        </p>
+        <input type="file" accept=".csv,text/csv" onChange={handleFile}
+          className="block w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-sm file:border-0 file:bg-forest file:text-white" />
+ 
+        {parseErrors.length > 0 && (
+          <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-sm p-2 max-h-24 overflow-auto">
+            {parseErrors.map((e, i) => <div key={i}>{e}</div>)}
+          </div>
+        )}
+ 
+        {rows.length > 0 && !summary && (
+          <p className="text-sm">Parsed <strong>{rows.length}</strong> rows. Duplicates (same phone, or same name in the same village) will be skipped.</p>
+        )}
+ 
+        {summary && (
+          <div className="text-sm bg-cream rounded-sm p-3 space-y-1">
+            <p>✅ Imported: <strong>{summary.imported}</strong></p>
+            <p>⏭ Skipped: <strong>{summary.skipped}</strong></p>
+            {summary.errors?.length > 0 && (
+              <div className="max-h-32 overflow-auto text-xs text-muted mt-2">
+                {summary.errors.map((e, i) => <div key={i}>Row {e.row} ({e.name || '—'}): {e.reason}</div>)}
+              </div>
+            )}
+          </div>
+        )}
+ 
+        <div className="flex justify-end gap-3">
+          <Button type="button" secondary onClick={onClose}>{summary ? 'Close' : 'Cancel'}</Button>
+          {!summary && <Button onClick={runImport} disabled={!rows.length || busy}>{busy ? 'Importing…' : `Import ${rows.length} rows`}</Button>}
+        </div>
+      </div>
+    </Modal>
   );
 }

@@ -16,7 +16,22 @@ const menuItems = [
   { to: '/admin/settings',  label: 'Settings',  icon: '⚙️', roles: ['super_admin'] },
 ];
 
-export default function Sidebar({ open, onClose }) {
+// Tooltip shown on hover when the sidebar is collapsed (icons-only mode).
+function Tip({ label, show }) {
+  if (!show) return null;
+  return (
+    <span
+      className="pointer-events-none absolute left-full ml-3 z-50 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium
+                 opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-lg"
+      style={{ background: '#0F1A13', color: '#EAF0EC' }}
+      role="tooltip"
+    >
+      {label}
+    </span>
+  );
+}
+ 
+export default function Sidebar({ open, onClose, collapsed = false, onToggleCollapse }) {
   const { user, logout } = useAuth();
   const userRole = user?.profile?.role;
 
@@ -27,59 +42,79 @@ export default function Sidebar({ open, onClose }) {
   const initials = (user?.profile?.name || user?.email || 'A')
     .split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
+  // Collapsed only applies on large screens; the mobile drawer is always full width.
+  const collapsedCls = collapsed ? 'lg:w-[72px]' : 'lg:w-64';
+ 
   return (
     <aside
       className={`
-        fixed inset-y-0 left-0 z-50 w-64 flex flex-col
-        transition-transform duration-300
+        fixed inset-y-0 left-0 z-50 w-64 ${collapsedCls} flex flex-col
+        transition-all duration-300
         lg:translate-x-0
         ${open ? 'translate-x-0' : '-translate-x-full'}
       `}
       style={{ background: '#162F22', color: '#cfdfd4' }}
     >
-      {/* Logo */}
-      <div className="px-6 pt-7 pb-6 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-        <div className="flex items-center gap-3">
+      {/* Logo + collapse toggle */}
+      <div
+        className={`border-b flex items-center ${collapsed ? 'lg:justify-center lg:px-2' : 'justify-between'} px-6 pt-7 pb-6`}
+        style={{ borderColor: 'rgba(255,255,255,0.08)' }}
+      >
+        <div className={collapsed ? 'lg:hidden' : ''}>
           <img src={logo} alt="Konkuwan Herbs" className="h-8 opacity-90" />
+          <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            B2B Admin Portal
+          </p>
         </div>
-        <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
-          B2B Admin Portal
-        </p>
+        {/* Collapse toggle — desktop only */}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition flex-shrink-0"
+        >
+          {collapsed ? '»' : '«'}
+        </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto overflow-x-visible">
         {visible.map(item => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
             onClick={onClose}
+            title={item.label}
             className={({ isActive }) => `
-              flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+              group relative flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium
               transition-all duration-150
+              ${collapsed ? 'px-3 lg:justify-center' : 'px-3'}
               ${isActive
                 ? 'bg-white/12 text-white'
                 : 'text-white/70 hover:bg-white/7 hover:text-white'
               }
             `}
           >
-            <span className="text-base w-5 text-center">{item.icon}</span>
-            <span>{item.label}</span>
+            <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
+            <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
+            <Tip label={item.label} show={collapsed} />
           </NavLink>
         ))}
       </nav>
 
       {/* User + logout */}
-      <div className="px-4 py-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-        <div className="flex items-center gap-3 mb-3">
+      <div className={`py-4 border-t ${collapsed ? 'px-2' : 'px-4'}`} style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div className={`flex items-center gap-3 mb-3 ${collapsed ? 'lg:justify-center' : ''}`}>
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
             style={{ background: '#dce5d3', color: '#1c2e1f' }}
+            title={user?.profile?.name || user?.email}
           >
             {initials}
           </div>
-          <div className="min-w-0">
+          <div className={`min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
             <p className="text-sm text-white/90 truncate font-medium">
               {user?.profile?.name || user?.email?.split('@')[0]}
             </p>
@@ -91,21 +126,27 @@ export default function Sidebar({ open, onClose }) {
         <NavLink
           to="/admin/account"
           onClick={onClose}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all mb-1"
+          title="My Account"
+          className={`group relative w-full flex items-center gap-2 py-2 rounded-xl text-sm transition-all mb-1 ${collapsed ? 'px-3 lg:justify-center' : 'px-3'}`}
           style={{ color: 'rgba(255,255,255,0.6)' }}
           onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.95)'}
           onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
         >
-          <span>⚙</span> My Account
+          <span className="w-5 text-center flex-shrink-0">⚙</span>
+          <span className={collapsed ? 'lg:hidden' : ''}>My Account</span>
+          <Tip label="My Account" show={collapsed} />
         </NavLink>
         <button
           onClick={logout}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all"
+          title="Logout"
+          className={`group relative w-full flex items-center gap-2 py-2 rounded-xl text-sm transition-all ${collapsed ? 'px-3 lg:justify-center' : 'px-3'}`}
           style={{ color: 'rgba(255,255,255,0.5)' }}
           onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
           onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
         >
-          <span>→</span> Logout
+          <span className="w-5 text-center flex-shrink-0">→</span>
+          <span className={collapsed ? 'lg:hidden' : ''}>Logout</span>
+          <Tip label="Logout" show={collapsed} />
         </button>
       </div>
     </aside>

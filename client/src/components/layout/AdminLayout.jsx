@@ -1,9 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../admin/Sidebar';
 
+const COLLAPSE_KEY = 'kk_sidebar_collapsed';
+
 export default function AdminLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
+  // Collapsed (icons-only) state persists across refresh and login
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
+  });
+ 
+  useEffect(() => {
+    try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch { /* ignore */ }
+  }, [collapsed]);
 
   return (
     <div className="flex min-h-screen" style={{ background: '#F4EFE6' }}>
@@ -15,9 +25,14 @@ export default function AdminLayout() {
         />
       )}
 
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed(c => !c)}
+      />
 
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
+      <div className={`flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ${collapsed ? 'lg:ml-[72px]' : 'lg:ml-64'}`}>
         {/* Mobile top bar */}
         <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-border">
           <button
@@ -39,18 +54,3 @@ export default function AdminLayout() {
     </div>
   );
 }
-
-/* initial code
-import { Outlet } from 'react-router-dom';
-import Sidebar from '../admin/Sidebar';
-
-export default function AdminLayout() {
-  return (
-    <div className="flex min-h-screen bg-cream">
-      <Sidebar />
-      <main className="flex-1 p-6 md:p-10 lg:ml-64">
-        <Outlet />
-      </main>
-    </div>
-  );
-}*/

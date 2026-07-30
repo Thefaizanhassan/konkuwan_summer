@@ -3,6 +3,25 @@ const { createCustomerSchema, updateCustomerSchema } = require('../validations/c
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
 
+// "Completed" orders for revenue purposes — the same definition the Finance
+// module and dashboard use, so totals agree across the platform.
+const COMPLETED_STATUSES = ['confirmed', 'dispatched', 'delivered'];
+ 
+// Sum completed-order value per customer for a set of customer ids
+async function purchaseTotals(customerIds) {
+  if (!customerIds.length) return {};
+  const { data } = await supabase
+    .from('orders')
+    .select('customer_id, total_amount, status')
+    .in('customer_id', customerIds)
+    .in('status', COMPLETED_STATUSES);
+  const totals = {};
+  (data || []).forEach((o) => {
+    totals[o.customer_id] = (totals[o.customer_id] || 0) + Number(o.total_amount || 0);
+  });
+  return totals;
+}
+
 exports.getAllCustomers = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -23,9 +42,13 @@ exports.getAllCustomers = async (req, res, next) => {
     const { data, count, error } = await q;
     if (error) return next(new AppError(error.message, 500));
 
+    // Total purchase amount per customer, from completed orders
+    const totals = await purchaseTotals((data || []).map((c) => c.id));
+    const rows = (data || []).map((c) => ({ ...c, total_purchased: totals[c.id] || 0 }));
+
     res.json({
       success: true,
-      data,
+      data: rows,
       pagination: { total: count, page, pages: Math.ceil((count || 0) / limit) },
     });
   } catch (err) { next(err); }
@@ -66,11 +89,12 @@ exports.getCustomerProfile = async (req, res, next) => {
       .order('order_date', { ascending: false });
  
     const rows = orders || [];
-    // Purchases exclude cancelled orders
-    const billable = rows.filter((o) => o.status !== 'cancelled');
+    // Completed orders only — same definition as the customer list column and
+    // the finance/dashboard revenue figures, so all screens agree.
+    const billable = rows.filter((o) => COMPLETED_STATUSES.includes(o.status));
     const total_purchased = billable.reduce((s, o) => s + Number(o.total_amount || 0), 0);
  
-    // Per-product quantity + spend across billable orders
+    // Per-product quantity + spend across completed orders
     const productMap = {};
     billable.forEach((o) => {
       (o.items || []).forEach((it) => {
@@ -90,7 +114,7 @@ exports.getCustomerProfile = async (req, res, next) => {
         customer,
         summary: {
           total_orders: rows.length,
-          billable_orders: billable.length,
+          billable_orders: billable.length, // completed orders counted in the total
           total_purchased,
           first_order_date: rows.length ? rows[rows.length - 1].order_date : null,
           last_order_date: rows.length ? rows[0].order_date : null,

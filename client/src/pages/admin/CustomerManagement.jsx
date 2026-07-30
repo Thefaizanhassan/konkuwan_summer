@@ -80,6 +80,15 @@ export default function CustomerManagement() {
     { header: 'Phone', accessor: 'phone' },
     { header: 'GSTIN', accessor: 'gstin' },
     {
+      header: 'Total Purchase',
+      accessor: 'total_purchased',
+      render: (val) => (
+        <span className={Number(val) > 0 ? 'font-semibold text-forest font-mono' : 'text-muted font-mono'}>
+          ₹{Number(val || 0).toLocaleString('en-IN')}
+        </span>
+      ),
+    },
+    {
       header: 'Lead Status',
       accessor: 'lead_status',
       render: (val) => (

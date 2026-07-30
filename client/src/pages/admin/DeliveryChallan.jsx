@@ -6,8 +6,20 @@ import Pagination from '../../components/ui/Pagination';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
- 
+import { downloadChallan } from '../../lib/invoice';
+
 const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+ 
+async function printChallan(id, setBusy) {
+  setBusy?.(true);
+  try {
+    await downloadChallan(id);
+  } catch (err) {
+    alert(err?.response?.data?.message || 'Failed to generate challan PDF.');
+  } finally {
+    setBusy?.(false);
+  }
+}
  
 export default function DeliveryChallan() {
   const queryClient = useQueryClient();
@@ -54,8 +66,12 @@ export default function DeliveryChallan() {
         isLoading={isLoading}
         onRowClick={(row) => setViewing(row)}
         actions={(row) => (
-          <button onClick={() => { if (confirm(`Delete challan ${row.challan_number}?`)) deleteChallan.mutate(row.id); }}
-            className="text-red-600 text-sm hover:underline">Delete</button>
+          <span className="flex gap-3 justify-end">
+            <button onClick={(e) => { e.stopPropagation(); printChallan(row.id); }}
+              className="text-sage hover:text-forest text-sm hover:underline">🖨 Print</button>
+            <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete challan ${row.challan_number}?`)) deleteChallan.mutate(row.id); }}
+              className="text-red-600 text-sm hover:underline">Delete</button>
+          </span>
         )}
       />
       <Pagination current={page} total={data?.pagination?.pages || 1} onChange={setPage} />
@@ -68,6 +84,7 @@ export default function DeliveryChallan() {
 }
  
 function ChallanDetail({ challan, onClose }) {
+  const [printing, setPrinting] = useState(false);
   return (
     <Modal onClose={onClose}>
       <div className="space-y-4">
@@ -76,6 +93,9 @@ function ChallanDetail({ challan, onClose }) {
             <h3 className="font-display text-2xl text-forest">{challan.challan_number}</h3>
             <p className="text-sm text-muted">{new Date(challan.challan_date).toLocaleDateString('en-IN')}</p>
           </div>
+          <Button type="button" secondary onClick={() => printChallan(challan.id, setPrinting)} disabled={printing}>
+            {printing ? 'Generating…' : '🖨 Print Delivery Challan'}
+          </Button>
         </div>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div><p className="text-muted uppercase text-xs">Farmer</p><p className="font-medium">{challan.farmer?.name || challan.farmer_name || '—'}</p></div>

@@ -15,6 +15,8 @@ router.get('/expenses', farmController.getExpenses);
 router.post('/expenses', farmController.addExpense);
 router.delete('/expenses/:id', farmController.deleteExpense);
 router.get('/farmers', farmController.getFarmers);
+router.get('/farmers/export', farmController.exportFarmers); // before /:id-style routes
+router.post('/farmers/import', farmController.importFarmers);
 router.post('/farmers', farmController.addFarmer);
 router.delete('/farmers/:id', farmController.deleteFarmer);
 router.post('/farmers/:id/visits', farmController.addVisit);

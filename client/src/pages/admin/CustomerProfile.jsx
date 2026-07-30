@@ -63,7 +63,7 @@ export default function CustomerProfile() {
       {/* Purchase summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <SummaryCard label="Total Purchased" value={inr(summary.total_purchased)} accent />
-        <SummaryCard label="Orders" value={summary.total_orders} sub={`${summary.billable_orders} billable`} />
+        <SummaryCard label="Orders" value={summary.total_orders} sub={`${summary.billable_orders} completed`} />
         <SummaryCard label="First Order" value={summary.first_order_date ? new Date(summary.first_order_date).toLocaleDateString('en-IN') : '—'} />
         <SummaryCard label="Last Order" value={summary.last_order_date ? new Date(summary.last_order_date).toLocaleDateString('en-IN') : '—'} />
       </div>
