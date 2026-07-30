@@ -11,5 +11,6 @@ router.post('/', orderController.createOrder);
 router.put('/:id/status', orderController.updateOrderStatus);
 router.put('/:id/items/:itemId/final-price', orderController.setItemFinalPrice);
 router.get('/:id/invoice', orderController.generateInvoice);
+router.get('/:id/quotation', orderController.generateQuotation);
 
 module.exports = router;

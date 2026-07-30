@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ScrollReveal from '../components/ui/ScrollReveal';
 import useScrollReveal from '../hooks/useScrollReveal';
 import apiClient from '../services/api';
@@ -8,6 +8,75 @@ const inputLight =
 const inputDark =
   'w-full bg-white/10 border border-white/20 px-4 py-3 rounded-lg text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition';
  
+// Searchable multi-select for products. Pulls the live catalogue and also
+// lets a buyer type a product not in the list (press Enter to add).
+function ProductMultiSelect({ selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [products, setProducts] = useState([]);
+  const boxRef = useRef(null);
+ 
+  useEffect(() => {
+    apiClient.get('/products', { params: { limit: 200 } })
+      .then(r => setProducts((r.data.data || []).map(p => p.name)))
+      .catch(() => setProducts([]));
+  }, []);
+ 
+  useEffect(() => {
+    const onDoc = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, []);
+ 
+  const toggle = (name) => {
+    onChange(selected.includes(name) ? selected.filter(s => s !== name) : [...selected, name]);
+  };
+  const addCustom = () => {
+    const v = query.trim();
+    if (v && !selected.includes(v)) onChange([...selected, v]);
+    setQuery('');
+  };
+ 
+  const filtered = products.filter(p =>
+    p.toLowerCase().includes(query.toLowerCase()) && !selected.includes(p));
+ 
+  return (
+    <div className="relative" ref={boxRef}>
+      <div
+        onClick={() => setOpen(true)}
+        className={`${inputLight} min-h-[46px] flex flex-wrap gap-1.5 items-center cursor-text`}
+      >
+        {selected.map(s => (
+          <span key={s} className="inline-flex items-center gap-1 bg-forest text-white text-xs px-2 py-1 rounded-full">
+            {s}
+            <button type="button" onClick={(e) => { e.stopPropagation(); toggle(s); }} className="hover:text-leaf">×</button>
+          </span>
+        ))}
+        <input
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }}
+          placeholder={selected.length ? '' : 'Product(s) needed — search or type…'}
+          className="flex-1 min-w-[120px] bg-transparent outline-none text-sm"
+        />
+      </div>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-border rounded-lg shadow-lg">
+          {filtered.length === 0 && !query && <p className="px-3 py-2 text-sm text-muted">Loading products…</p>}
+          {filtered.map(p => (
+            <button key={p} type="button" onClick={() => { toggle(p); setQuery(''); }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-cream/60">{p}</button>
+          ))}
+          {query.trim() && !products.some(p => p.toLowerCase() === query.trim().toLowerCase()) && (
+            <button type="button" onClick={addCustom}
+              className="w-full text-left px-3 py-2 text-sm text-sage hover:bg-cream/60">+ Add “{query.trim()}”</button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FormStatus({ status }) {
   if (!status) return null;
   const ok = status.type === 'success';
@@ -25,7 +94,7 @@ function FormStatus({ status }) {
 
 export default function Contact() {
   useScrollReveal();
-  const emptyBuyer = { name: '', company: '', product: '', quantity: '', email: '', phone: '' };
+  const emptyBuyer = { name: '', company: '', products: [], quantity: '', email: '', phone: '' };
   const emptyInvestor = { name: '', organisation: '', interest: '', email: '', message: '' };
  
   const [form, setForm] = useState(emptyBuyer);
@@ -38,9 +107,12 @@ export default function Contact() {
   const handleBuyerSubmit = async (e) => {
     e.preventDefault();
     setBuyerStatus(null);
+    if (!form.products || form.products.length === 0) {
+      return setBuyerStatus({ type: 'error', message: 'Please select at least one product.' });
+    }
     setBuyerSending(true);
     try {
-      await apiClient.post('/contact/buyer', form); // or send to Formspree
+      await apiClient.post('/contact/buyer', form);
       setBuyerStatus({ type: 'success', message: 'Request sent! We will get back within 2 working days.' });
       setForm(emptyBuyer);
     } catch (err) {
@@ -106,12 +178,14 @@ export default function Contact() {
                 <input required name="company" placeholder="Company name" value={form.company}
                   onChange={e => setForm({ ...form, company: e.target.value })} className={inputLight} />
               </div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <input required name="product" placeholder="Product(s) needed" value={form.product}
-                  onChange={e => setForm({ ...form, product: e.target.value })} className={inputLight} />
-                <input name="quantity" placeholder="Approx quantity (e.g., 5 MT)" value={form.quantity}
-                  onChange={e => setForm({ ...form, quantity: e.target.value })} className={inputLight} />
+              <div>
+                <ProductMultiSelect
+                  selected={form.products}
+                  onChange={(products) => setForm({ ...form, products })}
+                />
               </div>
+             <input name="quantity" placeholder="Approx quantity (e.g., 5 MT)" value={form.quantity}
+                onChange={e => setForm({ ...form, quantity: e.target.value })} className={inputLight} />
               <div className="grid sm:grid-cols-2 gap-4">
                 <input required type="email" name="email" placeholder="Email" value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })} className={inputLight} />

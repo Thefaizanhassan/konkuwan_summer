@@ -16,6 +16,7 @@ import Impact from './pages/Impact';
 import Partners from './pages/Partners';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import SetPassword from './pages/SetPassword';
 
 // Admin Pages
 import Login from './pages/admin/Login';
@@ -23,6 +24,10 @@ import Dashboard from './pages/admin/Dashboard';
 import ProductManagement from './pages/admin/ProductManagement';
 import OrderManagement from './pages/admin/OrderManagement';
 import CustomerManagement from './pages/admin/CustomerManagement';
+import CustomerProfile from './pages/admin/CustomerProfile';
+import DeliveryChallan from './pages/admin/DeliveryChallan';
+import Finance from './pages/admin/Finance';
+import Account from './pages/admin/Account';
 import ContactInbox from './pages/admin/ContactInbox';
 import UserManagement from './pages/admin/UserManagement';
 import AuditLogs from './pages/admin/AuditLogs';
@@ -48,8 +53,9 @@ export default function App() {
               <Route path="/contact" element={<Contact />} />
             </Route>
 
-            {/* ================= ADMIN LOGIN ================= */}
+            {/* ================= ADMIN LOGIN / SET PASSWORD ================= */}
             <Route path="/admin/login" element={<Login />} />
+            <Route path="/set-password" element={<SetPassword />} />
 
             {/* ================= PROTECTED ADMIN ROUTES ================= */}
             <Route element={<ProtectedRoute allowedRoles={[]} />}>
@@ -58,7 +64,11 @@ export default function App() {
                 <Route path="products" element={<ProductManagement />} />
                 <Route path="orders" element={<OrderManagement />} />
                 <Route path="customers" element={<CustomerManagement />} />
+                <Route path="customers/:id" element={<CustomerProfile />} />
+                <Route path="challans" element={<DeliveryChallan />} />
+                <Route path="finance" element={<Finance />} />
                 <Route path="inquiries" element={<ContactInbox />} />
+                <Route path="account" element={<Account />} />
                 <Route path="users" element={<UserManagement />} />
                 <Route path="audit-logs" element={<AuditLogs />} />
                 <Route path="settings" element={<Settings />} />

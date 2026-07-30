@@ -7,6 +7,7 @@ router.use(authorize('super_admin', 'order_manager'));
 
 router.get('/', customerController.getAllCustomers);
 router.get('/export', customerController.exportCustomers); // must be before /:id
+router.get('/:id/profile', customerController.getCustomerProfile);
 router.get('/:id', customerController.getCustomerById);
 router.post('/', customerController.createCustomer);
 router.put('/:id', customerController.updateCustomer);

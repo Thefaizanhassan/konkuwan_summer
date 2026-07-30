@@ -76,13 +76,16 @@ exports.inviteUser = async (req, res, next) => {
   try {
     const { email, role = 'viewer' } = req.body;
 
+    // Redirect the invite link to our Set Password page. CORS_ORIGIN is the
+    // site URL (must also be listed in Supabase Auth → URL Configuration →
+    // Redirect URLs for the link to be accepted).
+    const siteUrl = process.env.CORS_ORIGIN || 'http://localhost:5173';
     const { data, error } =
       await supabase.auth.admin.inviteUserByEmail(
         email,
         {
-          data: {
-            role,
-          },
+          data: { role },
+          redirectTo: `${siteUrl}/set-password`,
         }
       );
 

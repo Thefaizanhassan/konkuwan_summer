@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import CropOS from './CropOS';
-import FinanceOS from './FinanceOS';
+// import FinanceOS from './FinanceOS';
 import FarmerOS from './FarmerOS';
 import WarRoom from './WarRoom';
 
+// Finance moved to its own top-level sidebar page (/admin/finance).
 const TABS = [
   { key: 'crop', label: 'CropOS', emoji: '🌿' },
-  { key: 'finance', label: 'Finance', emoji: '💰' },
+  // { key: 'finance', label: 'Finance', emoji: '💰' },
   { key: 'farmers', label: 'Farmers', emoji: '👨‍🌾' },
   { key: 'warroom', label: 'War Room', emoji: '⚡' },
 ];
@@ -32,7 +33,7 @@ export default function FarmDashboard() {
         ))}
       </div>
       {tab === 'crop' && <CropOS />}
-      {tab === 'finance' && <FinanceOS />}
+      {/* {tab === 'finance' && <FinanceOS />} */}
       {tab === 'farmers' && <FarmerOS />}
       {tab === 'warroom' && <WarRoom />}
     </div>

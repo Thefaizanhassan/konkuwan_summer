@@ -183,6 +183,7 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
     price_max: product?.price_max || '',
     unit: product?.unit || 'kg',
     tags: product?.tags || '',
+    hsn_code: product?.hsn_code || '',
     is_active: product?.is_active ?? true,
   });
 
@@ -282,6 +283,10 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
             >
               {['kg', 'MT', 'ton', 'g', 'litre'].map(u => <option key={u}>{u}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">HSN / SAC Code</label>
+            <Input placeholder="e.g. 0910 (shown on invoices)" value={form.hsn_code} onChange={e => setForm({ ...form, hsn_code: e.target.value })} />
           </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-muted mb-1">Price Min (₹)</label>

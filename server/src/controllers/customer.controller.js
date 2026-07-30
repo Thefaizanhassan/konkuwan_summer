@@ -52,6 +52,56 @@ exports.getCustomerById = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /admin/customers/:id/profile — full account: info + order history +
+// purchase totals + per-product quantities (Task 5).
+exports.getCustomerProfile = async (req, res, next) => {
+  try {
+    const { data: customer, error } = await supabase.from('customers').select('*').eq('id', req.params.id).single();
+    if (error || !customer) return next(new AppError('Customer not found.', 404));
+ 
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('id, order_date, status, total_amount, invoice_number, quotation_number, items:order_items(quantity, unit, unit_price, final_price, line_total, product:products(id, name, unit))')
+      .eq('customer_id', req.params.id)
+      .order('order_date', { ascending: false });
+ 
+    const rows = orders || [];
+    // Purchases exclude cancelled orders
+    const billable = rows.filter((o) => o.status !== 'cancelled');
+    const total_purchased = billable.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+ 
+    // Per-product quantity + spend across billable orders
+    const productMap = {};
+    billable.forEach((o) => {
+      (o.items || []).forEach((it) => {
+        const key = it.product?.id || it.product?.name || 'unknown';
+        if (!productMap[key]) {
+          productMap[key] = { product: it.product?.name || '—', unit: it.unit || it.product?.unit || 'kg', quantity: 0, spend: 0 };
+        }
+        productMap[key].quantity += Number(it.quantity || 0);
+        productMap[key].spend += Number(it.final_price != null ? it.final_price * it.quantity : it.line_total || 0);
+      });
+    });
+    const products = Object.values(productMap).sort((a, b) => b.spend - a.spend);
+ 
+    res.json({
+      success: true,
+      data: {
+        customer,
+        summary: {
+          total_orders: rows.length,
+          billable_orders: billable.length,
+          total_purchased,
+          first_order_date: rows.length ? rows[rows.length - 1].order_date : null,
+          last_order_date: rows.length ? rows[0].order_date : null,
+        },
+        products,
+        orders: rows,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
 exports.createCustomer = async (req, res, next) => {
   try {
     const { error: vErr, value } = createCustomerSchema.validate(req.body, { stripUnknown: true });

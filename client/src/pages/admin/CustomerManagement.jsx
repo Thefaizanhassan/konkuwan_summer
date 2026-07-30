@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
 import DataTable from '../../components/ui/DataTable';
@@ -17,6 +18,7 @@ const customerApi = {
 
 export default function CustomerManagement() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [leadFilter, setLeadFilter] = useState('');
@@ -98,9 +100,9 @@ export default function CustomerManagement() {
     },
   ];
 
+  // Clicking a row opens the full customer profile (detailed account page)
   const handleEdit = (customer) => {
-    setEditingCustomer(customer);
-    setModalOpen(true);
+    navigate(`/admin/customers/${customer.id}`);
   };
 
   const handleDelete = (id) => {

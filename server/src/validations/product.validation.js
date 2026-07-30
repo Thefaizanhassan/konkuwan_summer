@@ -8,6 +8,7 @@ const createProductSchema = Joi.object({
   price_min: Joi.number().precision(2).min(0).optional().allow(null),
   price_max: Joi.number().precision(2).min(0).optional().allow(null),
   unit: Joi.string().max(50).default('kg'),
+  hsn_code: Joi.string().max(20).optional().allow('', null),
   tags: Joi.string().max(500).optional().allow('', null),
   is_active: Joi.boolean().default(true),
   category_ids: Joi.array().items(Joi.number().integer()).optional(),

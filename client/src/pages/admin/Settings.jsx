@@ -16,6 +16,19 @@ const SECTIONS = [
       { key: 'company_phone', label: 'Phone', placeholder: '+91 …' },
       { key: 'company_gstin', label: 'GSTIN', placeholder: '21XXXXX…' },
       { key: 'company_address', label: 'Address', type: 'textarea', span: 2 },
+      { key: 'company_pan', label: 'PAN', placeholder: 'AAHCK3264E' },
+    ],
+  },
+  {
+    title: 'Bank Details (Invoice)',
+    description: 'Shown in the Bank Details panel on generated invoices.',
+    icon: '🏦',
+    fields: [
+      { key: 'bank_account_name', label: 'Account Holder Name', placeholder: 'Konkuwan Herbs' },
+      { key: 'bank_account_number', label: 'Account Number' },
+      { key: 'bank_ifsc', label: 'IFSC' },
+      { key: 'bank_account_type', label: 'Account Type', placeholder: 'Current' },
+      { key: 'bank_name', label: 'Bank', placeholder: 'Axis Bank' },
     ],
   },
   {
@@ -50,7 +63,9 @@ const SECTIONS = [
     icon: '🧾',
     fields: [
       { key: 'invoice_due_days', label: 'Payment Due (days)', type: 'number', placeholder: '30' },
-      { key: 'invoice_tax_percent', label: 'Tax / GST (%)', type: 'number', placeholder: '0' },
+      { key: 'invoice_tax_percent', label: 'Tax / GST (%)', type: 'number', placeholder: '18' },
+      { key: 'invoice_terms', label: 'Invoice Terms (one per line)', type: 'textarea', span: 2 },
+      { key: 'quotation_terms', label: 'Quotation Terms (one per line)', type: 'textarea', span: 2 },
     ],
   },
 ];

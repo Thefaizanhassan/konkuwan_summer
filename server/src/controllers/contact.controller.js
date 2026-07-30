@@ -14,11 +14,16 @@ exports.submitBuyer = async (req, res, next) => {
     const { error: vErr, value } = buyerContactSchema.validate(req.body, { stripUnknown: true });
     if (vErr) return next(new AppError(vErr.details[0].message, 400));
  
+    // Store the multi-select list as a comma-separated string in `product`
+    const productStr = Array.isArray(value.products) && value.products.length
+      ? value.products.join(', ')
+      : value.product;
+ 
     const { error } = await supabase.from('contact_submissions').insert({
       type: 'buyer',
       name: value.name,
       company: value.company,
-      product: value.product,
+      product: productStr,
       quantity: value.quantity || null,
       email: value.email,
       phone: value.phone || null,

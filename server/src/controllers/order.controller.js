@@ -8,7 +8,44 @@ const {
 } = require('../validations/order.validation');
 
 const ORDER_SELECT =
-  '*, customer:customers(*), items:order_items(*, product:products(id,name,slug,unit))';
+  '*, customer:customers(*), items:order_items(*, product:products(id,name,slug,unit,hsn_code))';
+ 
+// Fetch several settings rows as a plain map { key: value }
+async function getSettings(keys) {
+  const { data } = await supabase.from('settings').select('key,value').in('key', keys);
+  const map = {};
+  (data || []).forEach((r) => { map[r.key] = r.value; });
+  return map;
+}
+ 
+// Indian financial year label for a date, e.g. 2026-04-10 -> "2026-27"
+function financialYear(dateStr) {
+  const d = new Date(dateStr);
+  const y = d.getFullYear();
+  const startYear = d.getMonth() >= 3 ? y : y - 1; // FY starts April (month index 3)
+  return `${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`;
+}
+ 
+// Next sequential number for a given order column (invoice_number/quotation_number)
+async function nextSequence(column) {
+  const { count } = await supabase
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .not(column, 'is', null);
+  return (count || 0) + 1;
+}
+ 
+// Shared "billed by" company block + bank + terms, from settings
+function companyBlock(s) {
+  return {
+    name: s.company_name || 'Konkuwan Herbs Pvt. Ltd.',
+    address: s.company_address || 'Baselisahi, Westgate, Puri, Odisha, India - 752001',
+    gstin: s.company_gstin || '',
+    pan: s.company_pan || '',
+    email: s.company_email || 'info@konkuwanherbs.com',
+    phone: s.company_phone || '',
+  };
+}
 
 exports.getAllOrders = async (req, res, next) => {
   try {
@@ -125,39 +162,149 @@ exports.setItemFinalPrice = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// Invoice JSON (consumed by the client PDF generator)
+// Invoice JSON (consumed by the client PDF generator).
+// Matches the sample layout: Billed By/To, per-item GST rate + IGST + HSN,
+// shipping, bank details, terms. Tax % and due days come from Settings (bug fix).
 exports.generateInvoice = async (req, res, next) => {
   try {
     const { data: order, error } = await supabase.from('orders').select(ORDER_SELECT).eq('id', req.params.id).single();
     if (error || !order) return next(new AppError('Order not found.', 404));
 
-    const due = new Date(order.order_date);
-    due.setDate(due.getDate() + 30);
+    const s = await getSettings([
+      'company_name', 'company_address', 'company_gstin', 'company_pan', 'company_email', 'company_phone',
+      'bank_account_name', 'bank_account_number', 'bank_ifsc', 'bank_account_type', 'bank_name',
+      'invoice_terms', 'invoice_tax_percent', 'invoice_due_days',
+    ]);
+ 
+    // Settings-driven tax % and payment-due days (Task 8 fix)
+    const taxPercent = parseFloat(s.invoice_tax_percent) || 0;
+    const dueDays = parseInt(s.invoice_due_days, 10);
+    const dueOffset = Number.isFinite(dueDays) ? dueDays : 30;
+ 
+    // Assign a stable, sequential invoice number the first time (persisted)
+    let invoiceNumber = order.invoice_number;
+    let invoiceDate = order.invoice_date || order.order_date;
+    if (!invoiceNumber) {
+      const seq = await nextSequence('invoice_number');
+      invoiceNumber = `KON/${financialYear(invoiceDate)}/${String(seq).padStart(2, '0')}`;
+      await supabase.from('orders').update({ invoice_number: invoiceNumber, invoice_date: invoiceDate }).eq('id', order.id);
+      await auditLog({ user: req.user, action: 'INVOICE', entity_type: 'order', entity_id: order.id, new_values: { invoice_number: invoiceNumber }, ip_address: req.ip });
+    }
+ 
+    const due = new Date(invoiceDate);
+    due.setDate(due.getDate() + dueOffset);
+ 
+    const items = (order.items || []).map((it) => {
+      const rate = it.final_price != null ? Number(it.final_price) : Number(it.unit_price);
+      const amount = Number(it.quantity) * rate;
+      const igst = +(amount * taxPercent / 100).toFixed(2);
+      return {
+        product: it.product?.name,
+        hsn: it.product?.hsn_code || null,
+        quantity: Number(it.quantity),
+        unit: it.unit,
+        rate,
+        amount: +amount.toFixed(2),
+        gst_rate: taxPercent,
+        igst,
+        total: +(amount + igst).toFixed(2),
+      };
+    });
+ 
+    const amountTotal = items.reduce((sum, it) => sum + it.amount, 0);
+    const igstTotal = items.reduce((sum, it) => sum + it.igst, 0);
+    const shipping = Number(order.shipping_charges || 0);
+    const grandTotal = +(amountTotal + igstTotal + shipping).toFixed(2);
 
     const invoice = {
-      invoice_number: `INV-${order.id.substring(0, 8).toUpperCase()}`,
-      date: order.order_date,
+      doc_type: 'invoice',
+      title: 'GST Invoice',
+      invoice_number: invoiceNumber,
+      quotation_number: order.quotation_number || null, // traceability link
+      date: invoiceDate,
       due_date: due.toISOString().slice(0, 10),
+      company: companyBlock(s),
+      customer: {
+        name: order.customer?.company_name,
+        contact: order.customer?.contact_person,
+        address: order.customer?.address,
+        gstin: order.customer?.gstin,
+        pan: order.customer?.pan || null,
+        email: order.customer?.email,
+        phone: order.customer?.phone,
+      },
+      items,
+      amount: +amountTotal.toFixed(2),
+      tax_percent: taxPercent,
+      igst: +igstTotal.toFixed(2),
+      shipping_charges: shipping,
+      total: grandTotal,
+      bank: {
+        account_name: s.bank_account_name || '',
+        account_number: s.bank_account_number || '',
+        ifsc: s.bank_ifsc || '',
+        account_type: s.bank_account_type || '',
+        bank_name: s.bank_name || '',
+      },
+      terms: (s.invoice_terms || '').split(/[|\n]/).map((t) => t.trim()).filter(Boolean),
+      status: order.status,
+    };
+    res.json({ success: true, data: invoice });
+  } catch (err) { next(err); }
+};
+ 
+// Quotation JSON — same structure, no tax columns / bank details (per sample).
+exports.generateQuotation = async (req, res, next) => {
+  try {
+    const { data: order, error } = await supabase.from('orders').select(ORDER_SELECT).eq('id', req.params.id).single();
+    if (error || !order) return next(new AppError('Order not found.', 404));
+ 
+    const s = await getSettings([
+      'company_name', 'company_address', 'company_gstin', 'company_pan', 'company_email', 'company_phone',
+      'quotation_terms',
+    ]);
+ 
+    // Assign a stable, unique quotation number the first time (persisted)
+    let quotationNumber = order.quotation_number;
+    let quotationDate = order.quotation_date || order.order_date;
+    if (!quotationNumber) {
+      const seq = await nextSequence('quotation_number');
+      quotationNumber = `K/${financialYear(quotationDate)}/K${seq}`;
+      const { error: uErr } = await supabase.from('orders').update({ quotation_number: quotationNumber, quotation_date: quotationDate }).eq('id', order.id);
+      if (uErr) return next(new AppError(uErr.message, 500));
+      await auditLog({ user: req.user, action: 'QUOTATION', entity_type: 'order', entity_id: order.id, new_values: { quotation_number: quotationNumber }, ip_address: req.ip });
+    }
+ 
+    const items = (order.items || []).map((it) => {
+      const rate = it.final_price != null ? Number(it.final_price) : Number(it.unit_price);
+      return {
+        product: it.product?.name,
+        quantity: Number(it.quantity),
+        unit: it.unit,
+        rate,
+        amount: +(Number(it.quantity) * rate).toFixed(2),
+      };
+    });
+    const total = items.reduce((sum, it) => sum + it.amount, 0);
+ 
+    const quotation = {
+      doc_type: 'quotation',
+      title: 'Quotation',
+      quotation_number: quotationNumber,
+      date: quotationDate,
+      company: companyBlock(s),
       customer: {
         name: order.customer?.company_name,
         contact: order.customer?.contact_person,
         address: order.customer?.address,
         gstin: order.customer?.gstin,
         email: order.customer?.email,
+        phone: order.customer?.phone,
       },
-      items: (order.items || []).map((it) => ({
-        product: it.product?.name,
-        quantity: it.quantity,
-        unit: it.unit,
-        unit_price: it.unit_price,
-        final_price: it.final_price,
-        line_total: it.final_price != null ? Number(it.final_price) : Number(it.line_total),
-      })),
-      subtotal: order.total_amount,
-      tax: 0, // set your GST treatment here when finalized
-      total: order.total_amount,
-      status: order.status,
+      items,
+      total: +total.toFixed(2),
+      terms: (s.quotation_terms || '').split(/[|\n]/).map((t) => t.trim()).filter(Boolean),
     };
-    res.json({ success: true, data: invoice });
+    res.json({ success: true, data: quotation });
   } catch (err) { next(err); }
 };

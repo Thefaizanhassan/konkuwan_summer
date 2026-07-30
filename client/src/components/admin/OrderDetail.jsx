@@ -4,7 +4,7 @@ import Modal from '../ui/Modal';
 import StatusBadge from '../ui/StatusBadge';
 import Button from '../ui/Button';
 import { useState } from 'react';
-import { downloadInvoice } from '../../lib/invoice';
+import { downloadInvoice, downloadQuotation } from '../../lib/invoice';
 
 const STATUS_FLOW = {
   draft: ['confirmed', 'cancelled'],
@@ -19,15 +19,29 @@ export default function OrderDetail({ order, onClose }) {
   const [editingItemId, setEditingItemId] = useState(null);
   const [finalPriceInput, setFinalPriceInput] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [quoting, setQuoting] = useState(false);
  
   const handleInvoice = async () => {
     setDownloading(true);
     try {
       await downloadInvoice(order.id);
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
     } catch (err) {
       alert(err?.response?.data?.message || 'Failed to generate invoice PDF.');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleQuotation = async () => {
+    setQuoting(true);
+    try {
+      await downloadQuotation(order.id);
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+    } catch (err) {
+      alert(err?.response?.data?.message || 'Failed to generate quotation PDF.');
+    } finally {
+      setQuoting(false);
     }
   };
 
@@ -61,12 +75,23 @@ export default function OrderDetail({ order, onClose }) {
           <div>
             <h3 className="font-display text-2xl text-forest">Order Details</h3>
             <p className="text-sm text-muted mt-1">#{order.id.slice(0, 8).toUpperCase()}</p>
+            {order.quotation_number && (
+              <p className="text-xs text-sage mt-0.5">Quotation: {order.quotation_number}</p>
+            )}
+            {order.invoice_number && (
+              <p className="text-xs text-sage">Invoice: {order.invoice_number}</p>
+            )}
           </div>
-          <div className="flex items-center gap-3">
-            <Button type="button" secondary onClick={handleInvoice} disabled={downloading}>
-              {downloading ? 'Generating…' : '🧾 Generate Invoice PDF'}
-            </Button>
+          <div className="flex flex-col items-end gap-2">
             <StatusBadge status={order.status} />
+            <div className="flex items-center gap-2">
+              <Button type="button" secondary onClick={handleQuotation} disabled={quoting}>
+                {quoting ? 'Generating…' : '📄 Generate Quotation'}
+              </Button>
+              <Button type="button" secondary onClick={handleInvoice} disabled={downloading}>
+                {downloading ? 'Generating…' : '🧾 Generate Invoice PDF'}
+              </Button>
+            </div>
           </div>
         </div>
 

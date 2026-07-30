@@ -1,0 +1,220 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import apiClient from '../../services/api';
+import DataTable from '../../components/ui/DataTable';
+import Pagination from '../../components/ui/Pagination';
+import Modal from '../../components/ui/Modal';
+import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
+ 
+const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+ 
+export default function DeliveryChallan() {
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [viewing, setViewing] = useState(null);
+ 
+  const { data, isLoading } = useQuery({
+    queryKey: ['challans', page, search],
+    queryFn: () => apiClient.get('/admin/challans', { params: { page, limit: 20, search } }).then(r => r.data),
+    keepPreviousData: true,
+  });
+ 
+  const deleteChallan = useMutation({
+    mutationFn: (id) => apiClient.delete(`/admin/challans/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['challans'] }),
+  });
+ 
+  const columns = [
+    { header: 'Challan #', accessor: 'challan_number' },
+    { header: 'Date', accessor: 'challan_date', render: (v) => v ? new Date(v).toLocaleDateString('en-IN') : '—' },
+    { header: 'Farmer', accessor: 'farmer_name', render: (v, row) => row.farmer?.name || v || '—' },
+    { header: 'Goods Value', accessor: 'goods_value', render: (v) => inr(v) },
+    { header: 'Charges', accessor: 'challan_charges', render: (v) => inr(v) },
+    { header: 'Total', accessor: 'total_value', render: (v) => <span className="font-semibold text-forest">{inr(v)}</span> },
+  ];
+ 
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-2">
+        <h2 className="font-display text-3xl text-forest">Delivery Challan</h2>
+        <Button onClick={() => setCreateOpen(true)}>+ New Challan</Button>
+      </div>
+      <p className="text-sm text-muted mb-6">Record purchases from farmers (crop pickup) before inventory is updated, including logistics charges.</p>
+ 
+      <div className="mb-4">
+        <Input placeholder="Search by challan number or farmer…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+      </div>
+ 
+      <DataTable
+        columns={columns}
+        data={data?.data || []}
+        isLoading={isLoading}
+        onRowClick={(row) => setViewing(row)}
+        actions={(row) => (
+          <button onClick={() => { if (confirm(`Delete challan ${row.challan_number}?`)) deleteChallan.mutate(row.id); }}
+            className="text-red-600 text-sm hover:underline">Delete</button>
+        )}
+      />
+      <Pagination current={page} total={data?.pagination?.pages || 1} onChange={setPage} />
+ 
+      {createOpen && <CreateChallanModal onClose={() => setCreateOpen(false)}
+        onSaved={() => { setCreateOpen(false); queryClient.invalidateQueries({ queryKey: ['challans'] }); }} />}
+      {viewing && <ChallanDetail challan={viewing} onClose={() => setViewing(null)} />}
+    </div>
+  );
+}
+ 
+function ChallanDetail({ challan, onClose }) {
+  return (
+    <Modal onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="font-display text-2xl text-forest">{challan.challan_number}</h3>
+            <p className="text-sm text-muted">{new Date(challan.challan_date).toLocaleDateString('en-IN')}</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div><p className="text-muted uppercase text-xs">Farmer</p><p className="font-medium">{challan.farmer?.name || challan.farmer_name || '—'}</p></div>
+          {challan.farmer?.village && <div><p className="text-muted uppercase text-xs">Village</p><p className="font-medium">{challan.farmer.village}</p></div>}
+        </div>
+        <div className="border border-border rounded-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-cream-dark text-xs text-muted uppercase">
+              <tr><th className="px-3 py-2 text-left">Product</th><th className="px-3 py-2 text-right">Qty</th><th className="px-3 py-2 text-right">Rate</th><th className="px-3 py-2 text-right">Total</th></tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {(challan.items || []).map(it => (
+                <tr key={it.id}>
+                  <td className="px-3 py-2">{it.product?.name || it.product_name || '—'}</td>
+                  <td className="px-3 py-2 text-right">{Number(it.quantity)} {it.unit}</td>
+                  <td className="px-3 py-2 text-right">{inr(it.purchase_rate)}</td>
+                  <td className="px-3 py-2 text-right">{inr(it.line_total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="text-sm space-y-1 text-right">
+          <p><span className="text-muted mr-3">Goods value:</span> {inr(challan.goods_value)}</p>
+          <p><span className="text-muted mr-3">Challan charges (logistics):</span> {inr(challan.challan_charges)}</p>
+          <p className="font-bold text-forest"><span className="mr-3">Total purchase value:</span> {inr(challan.total_value)}</p>
+        </div>
+        {challan.notes && <p className="text-sm bg-cream/50 rounded p-3"><span className="text-muted">Notes: </span>{challan.notes}</p>}
+      </div>
+    </Modal>
+  );
+}
+ 
+function CreateChallanModal({ onClose, onSaved }) {
+  const { data: farmers } = useQuery({
+    queryKey: ['farm-farmers-min'],
+    queryFn: () => apiClient.get('/admin/farm/farmers').then(r => r.data.data),
+  });
+  const { data: products } = useQuery({
+    queryKey: ['products-all'],
+    queryFn: () => apiClient.get('/products', { params: { limit: 200 } }).then(r => r.data.data),
+  });
+ 
+  const [farmerId, setFarmerId] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [charges, setCharges] = useState('');
+  const [notes, setNotes] = useState('');
+  const [items, setItems] = useState([{ product_id: '', quantity: '', unit: 'kg', purchase_rate: '' }]);
+ 
+  const setItem = (i, patch) => setItems(items.map((it, idx) => idx === i ? { ...it, ...patch } : it));
+  const onProductPick = (i, product_id) => {
+    const p = products?.find(x => x.id === product_id);
+    setItem(i, { product_id, unit: p?.unit || 'kg' });
+  };
+ 
+  const goods = items.reduce((s, it) => s + (parseFloat(it.quantity) || 0) * (parseFloat(it.purchase_rate) || 0), 0);
+  const total = goods + (parseFloat(charges) || 0);
+  const canSubmit = (farmerId || true) && items.every(it => it.product_id && parseFloat(it.quantity) > 0 && parseFloat(it.purchase_rate) >= 0);
+ 
+  const save = useMutation({
+    mutationFn: () => apiClient.post('/admin/challans', {
+      challan_date: date,
+      farmer_id: farmerId || null,
+      challan_charges: parseFloat(charges) || 0,
+      notes: notes || null,
+      items: items.map(it => ({
+        product_id: it.product_id || null,
+        product_name: products?.find(p => p.id === it.product_id)?.name || null,
+        quantity: parseFloat(it.quantity),
+        unit: it.unit,
+        purchase_rate: parseFloat(it.purchase_rate),
+      })),
+    }),
+    onSuccess: onSaved,
+    onError: (err) => alert(err?.response?.data?.message || 'Failed to create challan.'),
+  });
+ 
+  return (
+    <Modal onClose={onClose}>
+      <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
+        <h3 className="font-display text-xl text-forest">New Delivery Challan</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Farmer</label>
+            <select value={farmerId} onChange={e => setFarmerId(e.target.value)} className="w-full border border-border rounded-sm px-3 py-2 text-sm">
+              <option value="">Select farmer…</option>
+              {farmers?.map(f => <option key={f.id} value={f.id}>{f.name}{f.village ? ` · ${f.village}` : ''}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Date</label>
+            <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </div>
+        </div>
+ 
+        <div>
+          <label className="block text-xs uppercase tracking-wide text-muted mb-1">Products Purchased *</label>
+          {items.map((it, i) => (
+            <div key={i} className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center">
+              <select required value={it.product_id} onChange={e => onProductPick(i, e.target.value)}
+                className="border border-border rounded-sm px-2 py-2 text-sm">
+                <option value="">Crop / Product…</option>
+                {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <Input required type="number" min="0.01" step="any" placeholder={`Qty (${it.unit})`}
+                value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} />
+              <Input required type="number" min="0" step="any" placeholder="₹/unit (rate)"
+                value={it.purchase_rate} onChange={e => setItem(i, { purchase_rate: e.target.value })} />
+              <button type="button" onClick={() => setItems(items.filter((_, idx) => idx !== i))}
+                disabled={items.length === 1} className="text-red-500 text-lg disabled:opacity-30">×</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => setItems([...items, { product_id: '', quantity: '', unit: 'kg', purchase_rate: '' }])}
+            className="text-sm text-sage hover:text-forest">+ Add product</button>
+        </div>
+ 
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Challan Charges (₹)</label>
+            <Input type="number" min="0" step="any" placeholder="Pickup, transport, loading…" value={charges} onChange={e => setCharges(e.target.value)} />
+            <p className="text-[11px] text-muted mt-1">Logistics: crop pickup, transport to warehouse, loading/unloading, other procurement costs.</p>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Notes</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full border border-border rounded-sm px-3 py-2 text-sm" />
+          </div>
+        </div>
+ 
+        <div className="flex justify-between items-center pt-2 border-t border-border">
+          <div className="text-sm">
+            <span className="text-muted">Goods: <strong>{inr(goods)}</strong></span>
+            <span className="text-muted ml-4">Total purchase value: <strong className="text-forest">{inr(total)}</strong></span>
+          </div>
+          <div className="flex gap-3">
+            <Button type="button" secondary onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={!canSubmit || save.isPending}>{save.isPending ? 'Saving…' : 'Create Challan'}</Button>
+          </div>
+        </div>
+      </form>
+    </Modal>
+  );
+}

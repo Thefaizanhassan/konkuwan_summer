@@ -8,6 +8,8 @@ const menuItems = [
   { to: '/admin/orders',    label: 'Orders',    icon: '📦' },
   { to: '/admin/customers', label: 'Customers', icon: '👥' },
   { to: '/admin/inquiries', label: 'Inquiries', icon: '📬' },
+  { to: '/admin/challans',  label: 'Delivery Challan', icon: '📥' },
+  { to: '/admin/finance',   label: 'Finance',   icon: '💰' },
   { to: '/admin/farm',      label: 'Farm Ops',  icon: '🚜' },
   { to: '/admin/users',     label: 'Users',     icon: '👤', roles: ['super_admin'] },
   { to: '/admin/audit-logs',label: 'Audit Logs',icon: '📜' },
@@ -86,6 +88,16 @@ export default function Sidebar({ open, onClose }) {
             </p>
           </div>
         </div>
+        <NavLink
+          to="/admin/account"
+          onClick={onClose}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all mb-1"
+          style={{ color: 'rgba(255,255,255,0.6)' }}
+          onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.95)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
+        >
+          <span>⚙</span> My Account
+        </NavLink>
         <button
           onClick={logout}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition-all"
