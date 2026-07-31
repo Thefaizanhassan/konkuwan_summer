@@ -8,6 +8,16 @@
   "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat"],
  
+  // Joi's package.json "browser" field points at dist/joi-browser.min.js, a
+  // prebuilt bundle with the TLD list and domain manifest stripped out — it
+  // throws "Built-in TLD list disabled" / "Manifest functionality disabled"
+  // the moment .email() or .uri() is evaluated. Workers resolve browser
+  // conditions, so force the Node entry instead. This also keeps validation
+  // behaviour identical between local dev and production.
+  "alias": {
+    "joi": "./server/node_modules/joi/lib/index.js"
+  },
+
   "assets": {
     // The BUILT output, not the source directory. Pointing this at "client"
     // uploads node_modules and serves the unprocessed Vite index.html, which
