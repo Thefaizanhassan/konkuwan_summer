@@ -1,19 +1,21 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import logo from '../../assets/konkuwan_logo_white.svg';
 
+// labelKey resolves through i18n so the menu follows the selected language.
 const menuItems = [
-  { to: '/admin', label: 'Dashboard',   icon: '📊', end: true  },
-  { to: '/admin/products',  label: 'Products',  icon: '🌿' },
-  { to: '/admin/orders',    label: 'Orders',    icon: '📦' },
-  { to: '/admin/customers', label: 'Customers', icon: '👥' },
-  { to: '/admin/inquiries', label: 'Inquiries', icon: '📬' },
-  { to: '/admin/challans',  label: 'Delivery Challan', icon: '📥' },
-  { to: '/admin/finance',   label: 'Finance',   icon: '💰' },
-  { to: '/admin/farm',      label: 'Farm Ops',  icon: '🚜' },
-  { to: '/admin/users',     label: 'Users',     icon: '👤', roles: ['super_admin'] },
-  { to: '/admin/audit-logs',label: 'Audit Logs',icon: '📜' },
-  { to: '/admin/settings',  label: 'Settings',  icon: '⚙️', roles: ['super_admin'] },
+  { to: '/admin', labelKey: 'nav.dashboard',   icon: '📊', end: true  },
+  { to: '/admin/products',  labelKey: 'nav.products',  icon: '🌿' },
+  { to: '/admin/orders',    labelKey: 'nav.orders',    icon: '📦' },
+  { to: '/admin/customers', labelKey: 'nav.customers', icon: '👥' },
+  { to: '/admin/inquiries', labelKey: 'nav.inquiries', icon: '📬' },
+  { to: '/admin/challans',  labelKey: 'nav.challans',  icon: '📥' },
+  { to: '/admin/finance',   labelKey: 'nav.finance',   icon: '💰' },
+  { to: '/admin/farm',      labelKey: 'nav.farm',      icon: '🚜' },
+  { to: '/admin/users',     labelKey: 'nav.users',     icon: '👤', roles: ['super_admin'] },
+  { to: '/admin/audit-logs',labelKey: 'nav.auditLogs', icon: '📜' },
+  { to: '/admin/settings',  labelKey: 'nav.settings',  icon: '⚙️', roles: ['super_admin'] },
 ];
 
 // Tooltip shown on hover when the sidebar is collapsed (icons-only mode).
@@ -32,6 +34,7 @@ function Tip({ label, show }) {
 }
  
 export default function Sidebar({ open, onClose, collapsed = false, onToggleCollapse }) {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const userRole = user?.profile?.role;
 
@@ -63,15 +66,15 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
         <div className={collapsed ? 'lg:hidden' : ''}>
           <img src={logo} alt="Konkuwan Herbs" className="h-8 opacity-90" />
           <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
-            B2B Admin Portal
+            {t('nav.portal')}
           </p>
         </div>
         {/* Collapse toggle — desktop only */}
         <button
           type="button"
           onClick={onToggleCollapse}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
+          title={collapsed ? t('nav.expand') : t('nav.collapse')}
           className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition flex-shrink-0"
         >
           {collapsed ? '»' : '«'}
@@ -86,7 +89,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
             to={item.to}
             end={item.end}
             onClick={onClose}
-            title={item.label}
+            title={t(item.labelKey)}
             className={({ isActive }) => `
               group relative flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium
               transition-all duration-150
@@ -98,8 +101,8 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
             `}
           >
             <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
-            <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
-            <Tip label={item.label} show={collapsed} />
+            <span className={collapsed ? 'lg:hidden' : ''}>{t(item.labelKey)}</span>
+            <Tip label={t(item.labelKey)} show={collapsed} />
           </NavLink>
         ))}
       </nav>
@@ -118,35 +121,35 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
             <p className="text-sm text-white/90 truncate font-medium">
               {user?.profile?.name || user?.email?.split('@')[0]}
             </p>
-            <p className="text-xs capitalize" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              {userRole?.replace(/_/g, ' ') || 'viewer'}
+            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              {t(`users.roles.${userRole || 'viewer'}`, (userRole || 'viewer').replace(/_/g, ' '))}
             </p>
           </div>
         </div>
         <NavLink
           to="/admin/account"
           onClick={onClose}
-          title="My Account"
+          title={t('nav.myAccount')}
           className={`group relative w-full flex items-center gap-2 py-2 rounded-xl text-sm transition-all mb-1 ${collapsed ? 'px-3 lg:justify-center' : 'px-3'}`}
           style={{ color: 'rgba(255,255,255,0.6)' }}
           onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.95)'}
           onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
         >
           <span className="w-5 text-center flex-shrink-0">⚙</span>
-          <span className={collapsed ? 'lg:hidden' : ''}>My Account</span>
-          <Tip label="My Account" show={collapsed} />
+          <span className={collapsed ? 'lg:hidden' : ''}>{t('nav.myAccount')}</span>
+          <Tip label={t('nav.myAccount')} show={collapsed} />
         </NavLink>
         <button
           onClick={logout}
-          title="Logout"
+          title={t('nav.logout')}
           className={`group relative w-full flex items-center gap-2 py-2 rounded-xl text-sm transition-all ${collapsed ? 'px-3 lg:justify-center' : 'px-3'}`}
           style={{ color: 'rgba(255,255,255,0.5)' }}
           onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
           onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.5)'}
         >
           <span className="w-5 text-center flex-shrink-0">→</span>
-          <span className={collapsed ? 'lg:hidden' : ''}>Logout</span>
-          <Tip label="Logout" show={collapsed} />
+          <span className={collapsed ? 'lg:hidden' : ''}>{t('nav.logout')}</span>
+          <Tip label={t('nav.logout')} show={collapsed} />
         </button>
       </div>
     </aside>

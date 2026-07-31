@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Sidebar from '../admin/Sidebar';
 
 const COLLAPSE_KEY = 'kk_sidebar_collapsed';
 
 export default function AdminLayout() {
+  const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
   // Collapsed (icons-only) state persists across refresh and login
   const [collapsed, setCollapsed] = useState(() => {
@@ -38,13 +40,13 @@ export default function AdminLayout() {
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg hover:bg-cream"
-            aria-label="Open menu"
+            aria-label={t('nav.openMenu')}
           >
             <span className="block w-5 h-0.5 bg-forest mb-1" />
             <span className="block w-5 h-0.5 bg-forest mb-1" />
             <span className="block w-5 h-0.5 bg-forest" />
           </button>
-          <span className="font-display text-forest text-lg">Konkuwan Admin</span>
+          <span className="font-display text-forest text-lg">{t('nav.adminTitle')}</span>
         </div>
 
         <main className="flex-1 p-6 md:p-8 lg:p-10 overflow-auto">

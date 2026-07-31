@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
  
 // Pass onReorder(fromIndex, toIndex) to enable drag-and-drop row reordering —
 // a ⠿ handle column appears and rows become draggable.
 export default function DataTable({ columns, data, onRowClick, actions, isLoading, onReorder }) {
+  const { t } = useTranslation();
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
 
@@ -19,7 +21,7 @@ export default function DataTable({ columns, data, onRowClick, actions, isLoadin
   if (!data || data.length === 0) {
     return (
       <div className="rounded-2xl overflow-hidden" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
-        <div className="py-16 text-center text-sm text-muted">No data found.</div>
+        <div className="py-16 text-center text-sm text-muted">{t('common.noData')}</div>
       </div>
     );
   }
@@ -42,7 +44,7 @@ export default function DataTable({ columns, data, onRowClick, actions, isLoadin
               ))}
               {actions && (
                 <th className="text-right px-5 py-3.5 text-xs font-semibold uppercase tracking-wide" style={{ color: '#52674c', background: '#faf8f4' }}>
-                  Actions
+                  {t('common.actions')}
                 </th>
               )}
             </tr>
@@ -78,7 +80,7 @@ export default function DataTable({ columns, data, onRowClick, actions, isLoadin
                     className="px-2 py-3.5 text-center select-none"
                     style={{ cursor: 'grab', color: '#a8a294' }}
                     onClick={e => e.stopPropagation()}
-                    title="Drag to reorder"
+                    title={t('common.dragToReorder')}
                   >
                     ⠿
                   </td>

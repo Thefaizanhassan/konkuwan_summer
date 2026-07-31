@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '../../assets/konkuwan_logo_primary.svg';
 
 export default function Login() {
+  const { t } = useTranslation();
   const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -19,7 +21,7 @@ export default function Login() {
       await login(email, password);
       navigate('/admin');
     } catch (err) {
-      setError(err.message || 'Invalid email or password');
+      setError(err.message || t('auth.invalidCredentials'));
     } finally {
       setLoading(false);
     }
@@ -31,8 +33,8 @@ export default function Login() {
         <div className="flex justify-center mb-6">
           <img src={logo} alt="Konkuwan Herbs" className="h-10" />
         </div>
-        <h1 className="font-display text-2xl text-forest mb-1 text-center">Admin Login</h1>
-        <p className="text-sm text-muted text-center mb-6">Sign in to your dashboard</p>
+        <h1 className="font-display text-2xl text-forest mb-1 text-center">{t('auth.adminLogin')}</h1>
+        <p className="text-sm text-muted text-center mb-6">{t('auth.signInSubtitle')}</p>
 
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-sm text-sm">
@@ -42,7 +44,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-1">Email</label>
+            <label className="block text-xs uppercase tracking-wider text-muted mb-1">{t('common.email')}</label>
             <input
               type="email"
               value={email}
@@ -53,7 +55,7 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wider text-muted mb-1">Password</label>
+            <label className="block text-xs uppercase tracking-wider text-muted mb-1">{t('auth.password')}</label>
             <input
               type="password"
               value={password}
@@ -68,12 +70,12 @@ export default function Login() {
             disabled={loading}
             className="w-full bg-forest text-white py-2.5 rounded-sm font-medium hover:bg-forest-mid transition disabled:opacity-60"
           >
-            {loading ? 'Signing in…' : 'Sign In'}
+            {loading ? t('auth.signingIn') : t('auth.signIn')}
           </button>
         </form>
 
         <Link to="/" className="block mt-5 text-sm text-sage hover:text-forest transition text-center">
-          ← Back to site
+          ← {t('auth.backToSite')}
         </Link>
       </div>
     </div>

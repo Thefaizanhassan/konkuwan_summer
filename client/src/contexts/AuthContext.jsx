@@ -17,6 +17,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 import { supabase } from '../lib/supabase';
+import i18n from '../i18n';
 export { supabase };
 
 export default function AuthProvider({ children }) {
@@ -27,8 +28,19 @@ export default function AuthProvider({ children }) {
     apiClient.defaults.headers.common[
       'Authorization'
     ] = `Bearer ${accessToken}`;
+    // Apply the user's saved admin-panel language (falls back to the
+    // last-used one already loaded by i18n).
+    const lng = userData?.profile?.language;
+    if (lng && lng !== i18n.language) i18n.changeLanguage(lng);
     setUser(userData);
   };
+
+  // Lets Account settings update the language without a page reload
+  const setLanguage = useCallback(async (language) => {
+    await apiClient.patch('/me/preferences', { language });
+    await i18n.changeLanguage(language);
+    setUser((u) => (u ? { ...u, profile: { ...u.profile, language } } : u));
+  }, []);
 
   const clearAuth = () => {
     delete apiClient.defaults.headers.common['Authorization'];
@@ -123,6 +135,8 @@ export default function AuthProvider({ children }) {
         login,
         logout,
         loading,
+        setLanguage,
+        language: user?.profile?.language || i18n.language,
         isAuthenticated: !!user,
       }}
     >

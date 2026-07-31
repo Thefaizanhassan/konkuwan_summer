@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
@@ -17,6 +18,7 @@ const customerApi = {
 };
 
 export default function CustomerManagement() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
@@ -38,7 +40,7 @@ export default function CustomerManagement() {
     try {
       const { data: res } = await apiClient.get('/admin/customers/export');
       const rows = res.data || [];
-      if (!rows.length) return alert('No customers to export.');
+      if (!rows.length) return alert(t('customers.nothingToExport'));
       const csv = Papa.unparse(rows.map(r => ({
         ...r,
         created_at: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : '',
@@ -51,7 +53,7 @@ export default function CustomerManagement() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err?.response?.data?.message || 'Export failed.');
+      alert(err?.response?.data?.message || t('customers.exportFailed'));
     } finally {
       setExporting(false);
     }
@@ -70,17 +72,17 @@ export default function CustomerManagement() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] }),
     // Without this the delete failed silently (e.g. customer has orders —
     // the DB blocks the delete). Now the reason is shown.
-    onError: (err) => alert(err?.response?.data?.message || 'Failed to delete customer.'),
+    onError: (err) => alert(err?.response?.data?.message || t('customers.deleteFailed')),
   });
 
   const columns = [
-    { header: 'Company', accessor: 'company_name' },
-    { header: 'Contact', accessor: 'contact_person' },
-    { header: 'Email', accessor: 'email' },
-    { header: 'Phone', accessor: 'phone' },
-    { header: 'GSTIN', accessor: 'gstin' },
+    { header: t('customers.company'), accessor: 'company_name' },
+    { header: t('customers.contactPerson'), accessor: 'contact_person' },
+    { header: t('common.email'), accessor: 'email' },
+    { header: t('common.phone'), accessor: 'phone' },
+    { header: t('customers.gstin'), accessor: 'gstin' },
     {
-      header: 'Total Purchase',
+      header: t('customers.totalPurchase'),
       accessor: 'total_purchased',
       render: (val) => (
         <span className={Number(val) > 0 ? 'font-semibold text-forest font-mono' : 'text-muted font-mono'}>
@@ -89,22 +91,22 @@ export default function CustomerManagement() {
       ),
     },
     {
-      header: 'Lead Status',
+      header: t('customers.leadStatus'),
       accessor: 'lead_status',
       render: (val) => (
         <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
           val === 'potential_lead' ? 'bg-[#FBF3E4] text-earth' : 'bg-[#EAF4ED] text-forest'
         }`}>
-          {val === 'potential_lead' ? 'Potential Lead' : 'Active Customer'}
+          {val === 'potential_lead' ? t('customers.potentialLead') : t('customers.activeCustomer')}
         </span>
       ),
     },
     {
-      header: 'LinkedIn',
+      header: t('customers.linkedin'),
       accessor: 'linkedin_url',
       render: (val) => val
         ? <a href={val} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-             className="text-sage hover:text-forest text-sm">Profile ↗</a>
+             className="text-sage hover:text-forest text-sm">{t('customers.profileLink')} ↗</a>
         : <span className="text-muted text-sm">—</span>,
     },
   ];
@@ -115,24 +117,24 @@ export default function CustomerManagement() {
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('Delete this customer?')) deleteMutation.mutate(id);
+    if (window.confirm(t('customers.confirmDelete'))) deleteMutation.mutate(id);
   };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-3xl text-forest">Customers</h2>
-        {/* <Button onClick={() => { setEditingCustomer(null); setModalOpen(true); }}>Add Customer</Button> */}
+        <h2 className="font-display text-3xl text-forest">{t('customers.title')}</h2>
+        {/* <Button onClick={() => { setEditingCustomer(null); setModalOpen(true); }}>{t('customers.addCustomer')}</Button> */}
         <div className="flex gap-3">
-          <Button secondary onClick={handleExport} disabled={exporting}>{exporting ? 'Exporting…' : '⬇ Export CSV'}</Button>
-          <Button secondary onClick={() => setImportOpen(true)}>⬆ Import CSV</Button>
-          <Button onClick={() => { setEditingCustomer(null); setModalOpen(true); }}>Add Customer</Button>
+          <Button secondary onClick={handleExport} disabled={exporting}>{exporting ? t('common.exporting') : `⬇ ${t('common.exportCsv')}`}</Button>
+          <Button secondary onClick={() => setImportOpen(true)}>⬆ {t('common.importCsv')}</Button>
+          <Button onClick={() => { setEditingCustomer(null); setModalOpen(true); }}>{t('customers.addCustomer')}</Button>
         </div>
       </div>
       <div className="mb-4 flex gap-3 flex-wrap">
         <div className="flex-1 min-w-[220px]">
           <Input
-            placeholder="Search by company, contact, email..."
+            placeholder={t('customers.searchPlaceholder')}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
@@ -142,9 +144,9 @@ export default function CustomerManagement() {
           onChange={(e) => { setLeadFilter(e.target.value); setPage(1); }}
           className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
         >
-          <option value="">All Customers</option>
-          <option value="active_customer">Active Customers</option>
-          <option value="potential_lead">Potential Leads</option>
+          <option value="">{t('customers.allCustomers')}</option>
+          <option value="active_customer">{t('customers.activeCustomers')}</option>
+          <option value="potential_lead">{t('customers.potentialLeads')}</option>
         </select>
       </div>
       <DataTable
@@ -153,7 +155,7 @@ export default function CustomerManagement() {
         isLoading={isLoading}
         onRowClick={handleEdit}
         actions={(row) => (
-          <button onClick={() => handleDelete(row.id)} className="text-red-600 text-sm hover:underline">Delete</button>
+          <button onClick={() => handleDelete(row.id)} className="text-red-600 text-sm hover:underline">{t('common.delete')}</button>
         )}
       />
       <Pagination current={page} total={data?.pagination?.pages} onChange={setPage} />
@@ -181,6 +183,7 @@ export default function CustomerManagement() {
 }
 
 function CustomerFormModal({ customer, onClose, onSubmit, isLoading }) {
+  const { t } = useTranslation();
   // Only editable fields — never send id/created_at/updated_at back to the API
   const [form, setForm] = useState({
     company_name: customer?.company_name || '',
@@ -202,52 +205,52 @@ function CustomerFormModal({ customer, onClose, onSubmit, isLoading }) {
   return (
     <Modal onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <h3 className="font-display text-xl text-forest">{customer ? 'Edit Customer' : 'New Customer'}</h3>
+        <h3 className="font-display text-xl text-forest">{customer ? t('customers.editCustomer') : t('customers.newCustomer')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Company *</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('customers.company')} *</label>
             <input name="company_name" value={form.company_name} onChange={handleChange} required className={field} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Contact Person</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('customers.contactPerson')}</label>
             <input name="contact_person" value={form.contact_person} onChange={handleChange} className={field} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Email</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('common.email')}</label>
             <input name="email" type="email" value={form.email} onChange={handleChange} className={field} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Phone</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('common.phone')}</label>
             <input name="phone" value={form.phone} onChange={handleChange} className={field} />
           </div>
           <div className="col-span-2">
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Address</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('common.address')}</label>
             <textarea name="address" value={form.address} onChange={handleChange} className={field} rows={2} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">GSTIN</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('customers.gstin')}</label>
             <input name="gstin" value={form.gstin} onChange={handleChange} className={field} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Status of Lead</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('customers.leadStatus')}</label>
             <select name="lead_status" value={form.lead_status || 'active_customer'} onChange={handleChange} className={field}>
-              <option value="active_customer">Active Customer</option>
-              <option value="potential_lead">Potential Lead</option>
+              <option value="active_customer">{t('customers.activeCustomer')}</option>
+              <option value="potential_lead">{t('customers.potentialLead')}</option>
             </select>
           </div>
           <div className="col-span-2">
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">LinkedIn Profile URL</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('customers.linkedinUrl')}</label>
             <input name="linkedin_url" type="url" placeholder="https://linkedin.com/company/…"
               value={form.linkedin_url || ''} onChange={handleChange} className={field} />
           </div>
           <div className="col-span-2">
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Notes</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('common.notes')}</label>
             <textarea name="notes" value={form.notes} onChange={handleChange} className={field} rows={2} />
           </div>
         </div>
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" secondary onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save'}</Button>
+          <Button type="button" secondary onClick={onClose}>{t('common.cancel')}</Button>
+          <Button type="submit" disabled={isLoading}>{isLoading ? t('common.saving') : t('common.save')}</Button>
         </div>
       </form>
     </Modal>
@@ -255,6 +258,7 @@ function CustomerFormModal({ customer, onClose, onSubmit, isLoading }) {
 }
 
 function ImportCustomersModal({ onClose, onDone }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState([]);
   const [parseErrors, setParseErrors] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -304,7 +308,7 @@ function ImportCustomersModal({ onClose, onDone }) {
   return (
     <Modal onClose={onClose}>
       <div className="space-y-4">
-        <h3 className="font-display text-xl text-forest">Import Customers (CSV)</h3>
+        <h3 className="font-display text-xl text-forest">{t('customers.importTitle')}</h3>
         <p className="text-xs text-muted">
           Required column: <code>company_name</code>. Optional: contact_person, email, phone, address,
           gstin, notes, lead_status (active_customer / potential_lead), linkedin_url.
@@ -335,8 +339,8 @@ function ImportCustomersModal({ onClose, onDone }) {
         )}
 
         <div className="flex justify-end gap-3">
-          <Button type="button" secondary onClick={onClose}>{summary ? 'Close' : 'Cancel'}</Button>
-          {!summary && <Button onClick={runImport} disabled={!rows.length || busy}>{busy ? 'Importing…' : `Import ${rows.length} rows`}</Button>}
+          <Button type="button" secondary onClick={onClose}>{summary ? t('common.close') : t('common.cancel')}</Button>
+          {!summary && <Button onClick={runImport} disabled={!rows.length || busy}>{busy ? t('common.importing') : t('customers.importRows', { count: rows.length })}</Button>}
         </div>
       </div>
     </Modal>

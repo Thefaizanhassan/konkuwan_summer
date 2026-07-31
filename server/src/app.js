@@ -1,6 +1,7 @@
 const express = require('express');
 const authRoutes = require('./routes/auth.routes');
 
+const meRoutes = require('./routes/me.routes');
 const userAdminRoutes = require('./routes/user.admin.routes');
 const auditAdminRoutes = require('./routes/audit.admin.routes');
 const settingsAdminRoutes = require('./routes/settings.admin.routes');
@@ -85,6 +86,7 @@ app.get('/api/health', (req, res) => {
 // ── API Routes ──
 // Authentication
 app.use('/api/auth', authRoutes);
+app.use('/api/me', meRoutes);
 
 app.use('/api/admin/users', userAdminRoutes);
 app.use('/api/admin/audit-logs', auditAdminRoutes);

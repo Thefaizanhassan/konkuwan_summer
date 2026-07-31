@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolveImageUrl } from '../../lib/imageUrl';
 import { ASSET_GALLERY } from '../../lib/assetGallery';
@@ -9,7 +10,12 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Pagination from '../../components/ui/Pagination';
 
+// Page size — also used to compute the drag-and-drop reorder offset, so the
+// two must stay in sync.
+const PAGE_LIMIT = 20;
+
 export default function ProductManagement() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -18,7 +24,7 @@ export default function ProductManagement() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-products', page],
     queryFn: () =>
-      apiClient.get('/admin/products', { params: { page, limit: 20 } }).then(r => r.data),
+      apiClient.get('/admin/products', { params: { page, limit: PAGE_LIMIT } }).then(r => r.data),
   });
 
 //   const createMutation = useMutation({
@@ -53,15 +59,14 @@ export default function ProductManagement() {
   const deleteMutation = useMutation({
     mutationFn: (id) => apiClient.delete(`/admin/products/${id}/permanent`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-products'] }),
-    onError: (err) => alert(err?.response?.data?.message || 'Failed to delete product.'),
+    onError: (err) => alert(err?.response?.data?.message || t('products.deleteFailed')),
   });
  
-  const PAGE_LIMIT = 10;
   const reorderMutation = useMutation({
     mutationFn: ({ ids }) =>
       apiClient.put('/admin/products/reorder', { ids, start: (page - 1) * PAGE_LIMIT }),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['admin-products'] }),
-    onError: (err) => alert(err?.response?.data?.message || 'Failed to save order.'),
+    onError: (err) => alert(err?.response?.data?.message || t('products.orderFailed')),
   });
  
   // Drag-and-drop: reorder the current page locally, show it immediately,
@@ -75,22 +80,22 @@ export default function ProductManagement() {
   };
 
   const columns = [
-    { header: 'Name', accessor: 'name' },
-    { header: 'Botanical', accessor: 'botanical_name' },
+    { header: t('common.name'), accessor: 'name' },
+    { header: t('products.botanical'), accessor: 'botanical_name' },
     {
-      header: 'Price Range',
+      header: t('products.priceRange'),
       accessor: 'price_min',
       render: (_, row) =>
         row.price_min != null
           ? `₹${row.price_min} – ₹${row.price_max} / ${row.unit}`
-          : 'On inquiry',
+          : t('products.onInquiry'),
     },
     {
-      header: 'Active',
+      header: t('products.active'),
       accessor: 'is_active',
       render: (val) => val
-        ? <span className="text-green-600 text-xs font-medium">Active</span>
-        : <span className="text-red-500 text-xs font-medium">Archived</span>,
+        ? <span className="text-green-600 text-xs font-medium">{t('products.active')}</span>
+        : <span className="text-red-500 text-xs font-medium">{t('products.archived')}</span>,
     },
   ];
 
@@ -100,11 +105,11 @@ export default function ProductManagement() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-3xl text-forest">Products</h2>
-        <Button onClick={() => setModalOpen(true)}>+ Add Product</Button>
+        <h2 className="font-display text-3xl text-forest">{t('products.title')}</h2>
+        <Button onClick={() => setModalOpen(true)}>+ {t('products.addProduct')}</Button>
       </div>
 
-      <p className="text-xs text-muted mb-2">Drag the ⠿ handle to change the display order — it is saved automatically and reflected on the website.</p>
+      <p className="text-xs text-muted mb-2">{t('products.dragHint')}</p>
       <DataTable
         columns={columns}
         data={data?.data || []}
@@ -115,27 +120,27 @@ export default function ProductManagement() {
           <span className="flex gap-3 justify-end">
             {row.is_active ? (
               <button
-                onClick={(e) => { e.stopPropagation(); if (window.confirm('Mark this product as not available? It loses the green "Available" badge on the site.')) archiveMutation.mutate(row.id); }}
+                onClick={(e) => { e.stopPropagation(); if (window.confirm(t('products.confirmArchive'))) archiveMutation.mutate(row.id); }}
                 className="text-amber-700 text-sm hover:underline"
               >
-                Archive
+                {t('products.archive')}
               </button>
             ) : (
               <button
                 onClick={(e) => { e.stopPropagation(); unarchiveMutation.mutate(row.id); }}
                 className="text-green-700 text-sm hover:underline"
               >
-                Unarchive
+                {t('products.unarchive')}
               </button>
             )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (window.confirm(`Permanently DELETE "${row.name}"? This cannot be undone. Products used in orders cannot be deleted.`)) deleteMutation.mutate(row.id);
+                if (window.confirm(t('products.confirmDelete', { name: row.name }))) deleteMutation.mutate(row.id);
               }}
               className="text-red-600 text-sm hover:underline"
             >
-              Delete
+              {t('common.delete')}
             </button>
           </span>
         )}
@@ -173,6 +178,7 @@ export default function ProductManagement() {
 }
 
 function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     name: product?.name || '',
@@ -240,7 +246,7 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       onClose();
     } catch (err) {
-      alert(err?.response?.data?.message || 'Failed to save product.');
+      alert(err?.response?.data?.message || t('products.saveFailed'));
     } finally {
       setUploading(false);
     }
@@ -250,19 +256,19 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
     <Modal onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <h3 className="font-display text-xl text-forest">
-          {product ? 'Edit Product' : 'New Product'}
+          {product ? t('products.editProduct') : t('products.newProduct')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Name *</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('common.name')} *</label>
             <Input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Botanical Name</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('products.botanicalName')}</label>
             <Input value={form.botanical_name} onChange={e => setForm({ ...form, botanical_name: e.target.value })} />
           </div>
           <div className="col-span-2">
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Description</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('products.description')}</label>
             <textarea
               value={form.description}
               onChange={e => setForm({ ...form, description: e.target.value })}
@@ -271,11 +277,11 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
             />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Forms</label>
-            <Input placeholder="e.g. Dried · Powder" value={form.forms} onChange={e => setForm({ ...form, forms: e.target.value })} />
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('products.forms')}</label>
+            <Input placeholder={t('products.formsPlaceholder')} value={form.forms} onChange={e => setForm({ ...form, forms: e.target.value })} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Unit</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('products.unit')}</label>
             <select
               value={form.unit}
               onChange={e => setForm({ ...form, unit: e.target.value })}
@@ -285,31 +291,31 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">HSN / SAC Code</label>
-            <Input placeholder="e.g. 0910 (shown on invoices)" value={form.hsn_code} onChange={e => setForm({ ...form, hsn_code: e.target.value })} />
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('products.hsnCode')}</label>
+            <Input placeholder={t('products.hsnPlaceholder')} value={form.hsn_code} onChange={e => setForm({ ...form, hsn_code: e.target.value })} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Price Min (₹)</label>
-            <Input type="number" placeholder="Leave blank for 'On inquiry'" value={form.price_min} onChange={e => setForm({ ...form, price_min: e.target.value })} />
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('products.priceMin')}</label>
+            <Input type="number" placeholder={t('products.priceMinPlaceholder')} value={form.price_min} onChange={e => setForm({ ...form, price_min: e.target.value })} />
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Price Max (₹)</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('products.priceMax')}</label>
             <Input type="number" value={form.price_max} onChange={e => setForm({ ...form, price_max: e.target.value })} />
           </div>
 
           <div className="col-span-2">
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Tags (shown on public page)</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('products.tags')}</label>
             <Input
-              placeholder="e.g. Food processing, Ayurvedic, Export"
+              placeholder={t('products.tagsPlaceholder')}
               value={form.tags}
               onChange={e => setForm({ ...form, tags: e.target.value })}
             />
             <p className="text-[11px] text-muted mt-1">
-              Comma-separated. The green "Available" badge is added automatically while the product is active — no need to type it.
+              {t('products.tagsHelp')}
             </p>
             {form.tags && (
               <div className="flex gap-1.5 mt-2 flex-wrap">
-                {form.is_active && <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">Available</span>}
+                {form.is_active && <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">{t('products.available')}</span>}
                 {form.tags.split(',').map(t => t.trim()).filter(Boolean).map(t => (
                   <span key={t} className="text-xs px-2 py-0.5 bg-cream-dark text-forest-mid rounded-full">{t}</span>
                 ))}
@@ -319,7 +325,7 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
  
           {/* Images */}
           <div className="col-span-2">
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Product Images</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('products.images')}</label>
 
             {existing.length > 0 && (
               <div className="flex flex-wrap gap-3 mb-3">
@@ -332,9 +338,9 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
                     />
                     <div className="flex justify-between mt-1 text-[10px]">
                       <button type="button" onClick={() => setPrimary(img.id)} className="text-sage hover:text-forest">
-                        {img.is_primary ? '★ Primary' : 'Set primary'}
+                        {img.is_primary ? `★ ${t('products.primary')}` : t('products.setPrimary')}
                       </button>
-                      <button type="button" onClick={() => deleteImage(img.id)} className="text-red-500">Delete</button>
+                      <button type="button" onClick={() => deleteImage(img.id)} className="text-red-500">{t('common.delete')}</button>
                     </div>
                   </div>
                 ))}
@@ -348,9 +354,9 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
               onChange={onPickFiles}
               className="block w-full text-sm text-muted file:mr-3 file:py-2 file:px-4 file:rounded-sm file:border-0 file:bg-forest file:text-white file:text-sm hover:file:bg-forest-mid"
             />
-            <p className="text-[11px] text-muted mt-1">JPG / PNG / WebP, up to 5 files, 5 MB each.</p>
+            <p className="text-[11px] text-muted mt-1">{t('products.imagesHelp')}</p>
             {/* OR: pick from bundled asset gallery */}
-            <p className="text-xs uppercase tracking-wide text-muted mt-4 mb-2">Or pick from gallery</p>
+            <p className="text-xs uppercase tracking-wide text-muted mt-4 mb-2">{t('products.orGallery')}</p>
             <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto border border-border rounded-sm p-2">
               {ASSET_GALLERY.map((a) => (
                 <button key={a.url} type="button" title={a.name}
@@ -362,7 +368,7 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
             </div>
 
             {/* OR: external URL with live preview */}
-            <p className="text-xs uppercase tracking-wide text-muted mt-4 mb-1">Or paste an image URL</p>
+            <p className="text-xs uppercase tracking-wide text-muted mt-4 mb-1">{t('products.orUrl')}</p>
             <Input type="url" placeholder="https://…" value={imageUrlField} onChange={e => setImageUrlField(e.target.value)} />
             {imageUrlField && (
               <img src={imageUrlField} alt="preview" className="w-24 h-24 object-cover rounded border border-dashed border-sage mt-2"
@@ -390,15 +396,15 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
             </button>
             <span className="text-sm">
               {form.is_active
-                ? <><b className="text-green-700">Active</b> — shows the green "Available" badge on the public site</>
-                : <><b className="text-gray-500">Inactive</b> — listed on the site without the "Available" badge</>}
+                ? t('products.activeToggleOn')
+                : t('products.activeToggleOff')}
             </span>
           </div>
         </div>
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" secondary onClick={onClose}>Cancel</Button>
+          <Button type="button" secondary onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={isLoading || uploading}>
-            {(isLoading || uploading) ? 'Saving...' : 'Save Product'}
+            {(isLoading || uploading) ? t('common.saving') : t('products.saveProduct')}
           </Button>
         </div>
       </form>
@@ -468,7 +474,7 @@ function ProductFormModal({ product, onClose, onSubmit, isLoading }) {
           </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-muted mb-1">Price Min (₹)</label>
-            <Input type="number" placeholder="Leave blank for 'On inquiry'" value={form.price_min} onChange={e => setForm({ ...form, price_min: e.target.value })} />
+            <Input type="number" placeholder={t('products.priceBlankHint')} value={form.price_min} onChange={e => setForm({ ...form, price_min: e.target.value })} />
           </div>
           <div>
             <label className="block text-xs uppercase tracking-wide text-muted mb-1">Price Max (₹)</label>

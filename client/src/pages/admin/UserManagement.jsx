@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
 import DataTable from '../../components/ui/DataTable';
@@ -6,6 +7,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 
 export default function UserManagement() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -29,24 +31,26 @@ export default function UserManagement() {
     onSuccess: () => queryClient.invalidateQueries(['admin-users']),
   });
 
+  const roleLabel = (r) => (r ? t(`users.roles.${r}`, r.replace(/_/g, ' ')) : '—');
+
   const columns = [
-    { header: 'Name', accessor: 'name' },
-    { header: 'Email', accessor: 'email' },
-    { header: 'Role', accessor: 'role', render: (_, row) => row.profile?.role || row.role || '—' },
+    { header: t('common.name'), accessor: 'name' },
+    { header: t('common.email'), accessor: 'email' },
+    { header: t('users.role'), accessor: 'role', render: (_, row) => roleLabel(row.profile?.role || row.role) },
     {
-      header: 'Active',
+      header: t('users.activeStatus'),
       accessor: 'is_active',
       render: (_, row) => (row.profile?.is_active ?? row.is_active)
-        ? <span className="text-green-600 font-medium">Active</span>
-        : <span className="text-red-500 font-medium">Inactive</span>,
+        ? <span className="text-green-600 font-medium">{t('users.activeStatus')}</span>
+        : <span className="text-red-500 font-medium">{t('users.inactive')}</span>,
     },
   ];
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-3xl text-forest">Admin Users</h2>
-        <Button onClick={() => { setEditingUser(null); setModalOpen(true); }}>Invite User</Button>
+        <h2 className="font-display text-3xl text-forest">{t('users.adminUsers')}</h2>
+        <Button onClick={() => { setEditingUser(null); setModalOpen(true); }}>{t('users.inviteUser')}</Button>
       </div>
 
       <DataTable
@@ -59,7 +63,7 @@ export default function UserManagement() {
             onClick={(e) => { e.stopPropagation(); deactivateMutation.mutate(row.id); }}
             className="text-orange-600 text-sm hover:underline"
           >
-            {(row.profile?.is_active ?? row.is_active) ? 'Deactivate' : 'Already inactive'}
+            {(row.profile?.is_active ?? row.is_active) ? t('users.deactivate') : t('users.alreadyInactive')}
           </button>
         )}
       />
@@ -78,7 +82,7 @@ export default function UserManagement() {
                   queryClient.invalidateQueries(['admin-users']);
                   setModalOpen(false);
                 })
-                .catch(err => alert(err.response?.data?.message || 'Failed to send invitation'));
+                .catch(err => alert(err.response?.data?.message || t('users.inviteFailed')));
             }
           }}
           isLoading={updateMutation.isPending}
@@ -89,6 +93,7 @@ export default function UserManagement() {
 }
 
 function UserFormModal({ user, onClose, onSubmit, isLoading }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -107,12 +112,12 @@ function UserFormModal({ user, onClose, onSubmit, isLoading }) {
     <Modal onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <h3 className="font-display text-xl text-forest">
-          {user ? 'Edit User' : 'Invite New User'}
+          {user ? t('users.editUser') : t('users.inviteNew')}
         </h3>
 
         {user && (
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Name</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('common.name')}</label>
             <input
               value={form.name}
               onChange={e => setForm({ ...form, name: e.target.value })}
@@ -123,7 +128,7 @@ function UserFormModal({ user, onClose, onSubmit, isLoading }) {
 
         <div>
           <label className="block text-xs uppercase tracking-wide text-muted mb-1">
-            Email {!user && '*'}
+            {t('common.email')} {!user && '*'}
           </label>
           <input
             type="email"
@@ -135,14 +140,14 @@ function UserFormModal({ user, onClose, onSubmit, isLoading }) {
         </div>
 
         <div>
-          <label className="block text-xs uppercase tracking-wide text-muted mb-1">Role</label>
+          <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('users.role')}</label>
           <select
             value={form.role}
             onChange={e => setForm({ ...form, role: e.target.value })}
             className="w-full border border-border p-2 rounded-sm text-sm"
           >
             {ROLES.map(r => (
-              <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>
+              <option key={r} value={r}>{t(`users.roles.${r}`, r.replace(/_/g, ' '))}</option>
             ))}
           </select>
         </div>
@@ -155,14 +160,14 @@ function UserFormModal({ user, onClose, onSubmit, isLoading }) {
               checked={form.is_active}
               onChange={e => setForm({ ...form, is_active: e.target.checked })}
             />
-            <label htmlFor="is_active" className="text-sm">Active</label>
+            <label htmlFor="is_active" className="text-sm">{t('users.activeStatus')}</label>
           </div>
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" secondary onClick={onClose}>Cancel</Button>
+          <Button type="button" secondary onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Saving...' : user ? 'Save Changes' : 'Send Invite'}
+            {isLoading ? t('common.saving') : user ? t('users.saveChanges') : t('users.sendInvite')}
           </Button>
         </div>
       </form>

@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
 import apiClient from '../../../services/api';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 
+// `label` is the English fallback — the UI renders t('finance.categories.<id>').
 const CATEGORIES = [
   { id: 'labour', label: 'Labour', emoji: '👷', color: '#f59e0b' },
   { id: 'procurement', label: 'Procurement', emoji: '🌾', color: '#10b981' },
@@ -17,6 +19,7 @@ const CATEGORIES = [
 ];
 
 export default function FinanceOS() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [expForm, setExpForm] = useState({ date: new Date().toISOString().slice(0,10), by: 'CRP', amount: '', category: 'labour', description: '' });
   const [revForm, setRevForm] = useState({ date: new Date().toISOString().slice(0,10), amount: '', note: '' });
@@ -72,7 +75,7 @@ export default function FinanceOS() {
       queryClient.invalidateQueries({ queryKey: ['farm-cash-history'] });
       setCashVal('');
     },
-    onError: (err) => alert(err?.response?.data?.message || 'Failed to update cash position.'),
+    onError: (err) => alert(err?.response?.data?.message || t('finance.cashUpdateFailed')),
   });
   const deleteEntry = useMutation({
     mutationFn: (id) => apiClient.delete(`/admin/farm/expenses/${id}`),
@@ -106,33 +109,32 @@ export default function FinanceOS() {
       {/* EMI Alert — calculated from Settings, not dummy data */}
       {emi > 0 ? (
         <div className="bg-forest rounded-xl p-5 text-white">
-          <p className="text-xs uppercase tracking-widest opacity-70">EMI Alert</p>
-          <p className="text-2xl font-mono font-bold">₹{emi.toLocaleString('en-IN')}/mo</p>
+          <p className="text-xs uppercase tracking-widest opacity-70">{t('finance.emiAlert')}</p>
+          <p className="text-2xl font-mono font-bold">{t('finance.emiPerMonth', { amount: `₹${emi.toLocaleString('en-IN')}` })}</p>
           <p className="text-xs mt-1 opacity-80">
             {emiStartText
-              ? `${emiLabel} ${emiStarted ? 'active since' : 'begins'} ${emiStartText}`
+              ? t(emiStarted ? 'finance.emiActiveSince' : 'finance.emiBegins', { label: emiLabel, date: emiStartText })
               : emiLabel}
           </p>
         </div>
       ) : (
         <div className="bg-white rounded-xl p-5 border border-dashed text-muted text-sm">
-          No EMI configured. A super admin can set <b>Monthly EMI</b>, <b>EMI Start Date</b> and{' '}
-          <b>EMI Label</b> under Admin → Settings → Farm Finance.
+          {t('finance.noEmi')}
         </div>
       )}
 
       {/* Cash position */}
       <div className="bg-white p-4 rounded-lg border">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="font-display text-lg">Cash Position</h3>
+          <h3 className="font-display text-lg">{t('finance.cashPosition')}</h3>
           {cashAmount > 0 && (
             <span className="font-mono font-bold text-forest">₹{cashAmount.toLocaleString('en-IN')}</span>
           )}
         </div>
         <div className="flex gap-2">
-          <Input type="number" placeholder="New total cash on hand" value={cashVal} onChange={e => setCashVal(e.target.value)} />
+          <Input type="number" placeholder={t('finance.newCashTotal')} value={cashVal} onChange={e => setCashVal(e.target.value)} />
           <Button onClick={() => updateCash.mutate(cashVal)} disabled={updateCash.isPending || cashVal === ''}>
-            {updateCash.isPending ? 'Saving…' : 'Update'}
+            {updateCash.isPending ? t('common.saving') : t('finance.update')}
           </Button>
         </div>
  
@@ -144,7 +146,7 @@ export default function FinanceOS() {
               onClick={() => setShowCashHistory(!showCashHistory)}
               className="text-xs text-sage hover:text-forest underline"
             >
-              {showCashHistory ? 'Hide' : 'Show'} update history ({cashHistory.length})
+              {t(showCashHistory ? 'finance.hideHistory' : 'finance.showHistory', { count: cashHistory.length })}
             </button>
             {showCashHistory && (
               <div className="mt-2 divide-y divide-border text-xs border border-border rounded-lg overflow-hidden">
@@ -170,7 +172,7 @@ export default function FinanceOS() {
           <div className={`mt-3 p-3 rounded-lg ${
             cashAmount > emi*2 ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
           }`}>
-            Safe deploy (cash − 2× EMI): ₹{Math.max(0, cashAmount - emi*2).toLocaleString('en-IN')}
+            {t('finance.safeDeploy')}: ₹{Math.max(0, cashAmount - emi*2).toLocaleString('en-IN')}
           </div>
         )}
       </div>
@@ -178,20 +180,20 @@ export default function FinanceOS() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white p-4 rounded-lg border text-center">
-          <p className="text-xs uppercase tracking-wider text-green-700">Revenue This Month</p>
+          <p className="text-xs uppercase tracking-wider text-green-700">{t('finance.revenueThisMonth')}</p>
           <p className="text-xl font-mono font-bold text-green-700">₹{totalRev.toLocaleString('en-IN')}</p>
           <p className="text-[11px] text-muted mt-0.5">
-            ₹{loggedRev.toLocaleString('en-IN')} logged + ₹{productSales.toLocaleString('en-IN')} product sales
-            {finSummary?.orders_count ? ` (${finSummary.orders_count} orders)` : ''}
+            {t('finance.revenueBreakdown', { logged: `₹${loggedRev.toLocaleString('en-IN')}`, sales: `₹${productSales.toLocaleString('en-IN')}` })}
+            {finSummary?.orders_count ? ` ${t('finance.ordersCount', { count: finSummary.orders_count })}` : ''}
           </p>
           <div className="mt-2">
             <Button secondary onClick={() => setShowRevForm(v => !v)}>
-              {showRevForm ? 'Close' : '+ Log Revenue'}
+              {showRevForm ? t('common.close') : `+ ${t('finance.logRevenue')}`}
             </Button>
           </div>
         </div>
         <div className="bg-white p-4 rounded-lg border text-center">
-          <p className="text-xs uppercase tracking-wider text-orange-700">Expenses This Month</p>
+          <p className="text-xs uppercase tracking-wider text-orange-700">{t('finance.expensesThisMonth')}</p>
           <p className="text-xl font-mono font-bold text-orange-700">₹{totalExp.toLocaleString()}</p>
         </div>
       </div>
@@ -199,24 +201,24 @@ export default function FinanceOS() {
       {/* Revenue form */}
       {showRevForm && (
         <div className="bg-white p-4 rounded-lg border space-y-3">
-          <h4 className="font-display">Log Revenue</h4>
+          <h4 className="font-display">{t('finance.logRevenue')}</h4>
           <div className="grid grid-cols-2 gap-3">
-            <Input type="number" placeholder="Amount" value={revForm.amount} onChange={e => setRevForm({...revForm, amount: e.target.value})} />
+            <Input type="number" placeholder={t('common.amount')} value={revForm.amount} onChange={e => setRevForm({...revForm, amount: e.target.value})} />
             <Input type="date" value={revForm.date} onChange={e => setRevForm({...revForm, date: e.target.value})} />
           </div>
-          <Input placeholder="Source / Buyer" value={revForm.note} onChange={e => setRevForm({...revForm, note: e.target.value})} />
+          <Input placeholder={t('finance.sourceBuyer')} value={revForm.note} onChange={e => setRevForm({...revForm, note: e.target.value})} />
           <Button
             disabled={addRevenue.isPending || !revForm.amount}
             onClick={() => { addRevenue.mutate({ ...revForm, amount: parseFloat(revForm.amount) }); setShowRevForm(false); }}
           >
-            {addRevenue.isPending ? 'Saving…' : 'Save Revenue'}
+            {addRevenue.isPending ? t('common.saving') : t('finance.saveRevenue')}
           </Button>
         </div>
       )}
 
       {/* Expense form */}
       <div className="bg-white p-4 rounded-lg border space-y-3">
-        <h3 className="font-display text-lg">Log Expense</h3>
+        <h3 className="font-display text-lg">{t('finance.logExpense')}</h3>
         <div className="grid grid-cols-2 gap-3">
           <Input type="date" value={expForm.date} onChange={e => setExpForm({...expForm, date: e.target.value})} />
           <select value={expForm.by} onChange={e => setExpForm({...expForm, by: e.target.value})} className="border rounded-sm p-2">
@@ -231,44 +233,44 @@ export default function FinanceOS() {
               }`}
               style={expForm.category === c.id ? { borderColor: c.color, backgroundColor: c.color + '30', color: c.color } : {}}
             >
-              {c.emoji} {c.label}
+              {c.emoji} {t(`finance.categories.${c.id}`, c.label)}
             </button>
           ))}
         </div>
         <div>
-          <label className="block text-xs uppercase tracking-wider text-muted mb-1">Bill / Receipt (optional)</label>
+          <label className="block text-xs uppercase tracking-wider text-muted mb-1">{t('finance.receipt')}</label>
           <input type="file" accept="application/pdf,image/jpeg,image/png"
             onChange={e => setReceiptFile(e.target.files?.[0] || null)}
             className="block w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:bg-forest file:text-white" />
           {receiptFile && <p className="text-xs text-muted mt-1">{receiptFile.name} ({Math.round(receiptFile.size/1024)} KB)</p>}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input type="number" placeholder="Amount" value={expForm.amount} onChange={e => setExpForm({...expForm, amount: e.target.value})} />
-          <Input placeholder="Description" value={expForm.description} onChange={e => setExpForm({...expForm, description: e.target.value})} />
+          <Input type="number" placeholder={t('common.amount')} value={expForm.amount} onChange={e => setExpForm({...expForm, amount: e.target.value})} />
+          <Input placeholder={t('finance.description')} value={expForm.description} onChange={e => setExpForm({...expForm, description: e.target.value})} />
         </div>
         {/* <Button fullWidth onClick={() => addExpense.mutate({ ...expForm, amount: parseFloat(expForm.amount) })}>Add Expense</Button> */}
         <Button fullWidth disabled={addExpense.isPending || uploadingReceipt}
           onClick={async () => {
             let receipt_url = null;
             if (receiptFile) {
-              if (receiptFile.size > 5 * 1024 * 1024) return alert('Receipt must be under 5 MB.');
+              if (receiptFile.size > 5 * 1024 * 1024) return alert(t('finance.receiptTooLarge'));
               setUploadingReceipt(true);
               const path = `${Date.now()}-${receiptFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
               const { error } = await supabase.storage.from('receipts').upload(path, receiptFile);
               setUploadingReceipt(false);
-              if (error) return alert('Receipt upload failed: ' + error.message);
+              if (error) return alert(t('finance.receiptFailed', { message: error.message }));
               receipt_url = supabase.storage.from('receipts').getPublicUrl(path).data.publicUrl;
             }
             addExpense.mutate({ ...expForm, amount: parseFloat(expForm.amount), receipt_url });
             setReceiptFile(null);
           }}>
-          {uploadingReceipt ? 'Uploading receipt…' : 'Add Expense'}
+          {uploadingReceipt ? t('finance.uploadingReceipt') : t('finance.addExpense')}
         </Button>
       </div>
 
       {/* Recent transactions */}
       <div className="bg-white rounded-lg border">
-        <div className="p-4 border-b font-display text-lg">Recent Transactions</div>
+        <div className="p-4 border-b font-display text-lg">{t('finance.recentTransactions')}</div>
         {expenses?.slice().reverse().slice(0, 10).map(e => {
           const cat = CATEGORIES.find(c => c.id === e.category);
           return (
@@ -278,7 +280,7 @@ export default function FinanceOS() {
                 <p className="text-sm font-medium truncate">{e.description}</p>
                 {e.receipt_url && (
                   <a href={e.receipt_url} target="_blank" rel="noopener noreferrer"
-                     className="text-xs text-sage hover:text-forest">📎 Receipt</a>
+                     className="text-xs text-sage hover:text-forest">📎 {t('finance.receiptLink')}</a>
                 )}
                 <p className="text-xs text-muted">{e.date} · {e.logged_by_name}</p>
               </div>

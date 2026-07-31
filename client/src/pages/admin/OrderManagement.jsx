@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
 import DataTable from '../../components/ui/DataTable';
@@ -18,6 +19,7 @@ const orderApi = {
 };
 
 export default function OrderManagement() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(1);
@@ -80,23 +82,23 @@ export default function OrderManagement() {
 
   const columns = [
     {
-      header: 'Customer',
+      header: t('orders.customer'),
       accessor: 'Customer',
       render: (_, row) => row.Customer?.company_name || '—',
     },
     {
-      header: 'Status',
+      header: t('common.status'),
       accessor: 'status',
       render: (val) => <StatusBadge status={val} />,
     },
     {
-      header: 'Total',
+      header: t('common.total'),
       accessor: 'total_amount',
       render: (val) =>
         `₹${Number(val || 0).toLocaleString()}`,
     },
     {
-      header: 'Date',
+      header: t('common.date'),
       accessor: 'order_date',
       render: (val) =>
         val ? new Date(val).toLocaleDateString() : '—',
@@ -114,8 +116,8 @@ export default function OrderManagement() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="font-display text-3xl text-forest">Orders</h2>
-        <Button onClick={() => setCreateOpen(true)}>+ New Order</Button>
+        <h2 className="font-display text-3xl text-forest">{t('orders.title')}</h2>
+        <Button onClick={() => setCreateOpen(true)}>+ {t('orders.newOrder')}</Button>
       </div>
 
       <div className="mb-4 flex gap-3 flex-wrap">
@@ -131,11 +133,11 @@ export default function OrderManagement() {
           className="border border-border rounded-sm px-3 py-2 text-sm"
           // className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
         >
-          <option value="">All statuses</option>
+          <option value="">{t('orders.allStatuses')}</option>
 
           {STATUSES.map((status) => (
             <option key={status} value={status}>
-              {status}
+              {t(`orders.status.${status}`)}
             </option>
           ))}
         </select>
@@ -215,6 +217,7 @@ export default function OrderManagement() {
 }
 
 function CreateOrderModal({ onClose, onSubmit, isLoading, error }) {
+  const { t } = useTranslation();
   const { data: customers } = useQuery({
     queryKey: ['customers-all'],
     queryFn: () => apiClient.get('/admin/customers', { params: { limit: 200 } }).then(r => r.data.data),
@@ -263,30 +266,30 @@ function CreateOrderModal({ onClose, onSubmit, isLoading, error }) {
   return (
     <Modal onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <h3 className="font-display text-xl text-forest">New Order</h3>
+        <h3 className="font-display text-xl text-forest">{t('orders.newOrder')}</h3>
         {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-sm px-3 py-2">{error}</p>}
 
         <div>
-          <label className="block text-xs uppercase tracking-wide text-muted mb-1">Customer *</label>
+          <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('orders.customer')} *</label>
           <select required value={customerId} onChange={e => setCustomerId(e.target.value)}
             className="w-full border border-border rounded-sm px-3 py-2 text-sm">
-            <option value="">Select customer…</option>
+            <option value="">{t('orders.selectCustomer')}</option>
             {customers?.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
           </select>
         </div>
 
         <div>
-          <label className="block text-xs uppercase tracking-wide text-muted mb-1">Line Items *</label>
+          <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('orders.lineItems')} *</label>
           {items.map((it, i) => (
             <div key={i} className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center">
               <select required value={it.product_id} onChange={e => onProductPick(i, e.target.value)}
                 className="border border-border rounded-sm px-2 py-2 text-sm">
-                <option value="">Product…</option>
+                <option value="">{t('common.product')}…</option>
                 {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <Input required type="number" min="0.01" step="any" placeholder={`Qty (${it.unit})`}
                 value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} />
-              <Input required type="number" min="0.01" step="any" placeholder="₹/unit"
+              <Input required type="number" min="0.01" step="any" placeholder={t('orders.unitPrice')}
                 value={it.unit_price} onChange={e => setItem(i, { unit_price: e.target.value })} />
               <button type="button" onClick={() => setItems(items.filter((_, idx) => idx !== i))}
                 disabled={items.length === 1} className="text-red-500 text-lg disabled:opacity-30">×</button>
@@ -294,20 +297,20 @@ function CreateOrderModal({ onClose, onSubmit, isLoading, error }) {
           ))}
           <button type="button"
             onClick={() => setItems([...items, { product_id: '', quantity: '', unit: 'kg', unit_price: '' }])}
-            className="text-sm text-sage hover:text-forest">+ Add line</button>
+            className="text-sm text-sage hover:text-forest">+ {t('orders.addLine')}</button>
         </div>
 
         <div>
-          <label className="block text-xs uppercase tracking-wide text-muted mb-1">Notes</label>
+          <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('common.notes')}</label>
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
             className="w-full border border-border rounded-sm px-3 py-2 text-sm" />
         </div>
 
         <div className="flex justify-between items-center pt-2">
-          <span className="text-sm text-muted">Estimated total: <strong className="text-forest">₹{total.toLocaleString('en-IN')}</strong></span>
+          <span className="text-sm text-muted">{t('orders.estimatedTotal')}: <strong className="text-forest">₹{total.toLocaleString('en-IN')}</strong></span>
           <div className="flex gap-3">
-            <Button type="button" secondary onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={!canSubmit || isLoading}>{isLoading ? 'Creating…' : 'Create Order'}</Button>
+            <Button type="button" secondary onClick={onClose}>{t('common.cancel')}</Button>
+            <Button type="submit" disabled={!canSubmit || isLoading}>{isLoading ? t('orders.creating') : t('orders.createOrder')}</Button>
           </div>
         </div>
       </form>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
 import DataTable from '../../components/ui/DataTable';
@@ -22,6 +23,7 @@ async function printChallan(id, setBusy) {
 }
  
 export default function DeliveryChallan() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -40,24 +42,24 @@ export default function DeliveryChallan() {
   });
  
   const columns = [
-    { header: 'Challan #', accessor: 'challan_number' },
-    { header: 'Date', accessor: 'challan_date', render: (v) => v ? new Date(v).toLocaleDateString('en-IN') : '—' },
-    { header: 'Farmer', accessor: 'farmer_name', render: (v, row) => row.farmer?.name || v || '—' },
-    { header: 'Goods Value', accessor: 'goods_value', render: (v) => inr(v) },
-    { header: 'Charges', accessor: 'challan_charges', render: (v) => inr(v) },
-    { header: 'Total', accessor: 'total_value', render: (v) => <span className="font-semibold text-forest">{inr(v)}</span> },
+    { header: t('challans.challanNumber'), accessor: 'challan_number' },
+    { header: t('common.date'), accessor: 'challan_date', render: (v) => v ? new Date(v).toLocaleDateString('en-IN') : '—' },
+    { header: t('challans.farmer'), accessor: 'farmer_name', render: (v, row) => row.farmer?.name || v || '—' },
+    { header: t('challans.goodsValue'), accessor: 'goods_value', render: (v) => inr(v) },
+    { header: t('challans.charges'), accessor: 'challan_charges', render: (v) => inr(v) },
+    { header: t('common.total'), accessor: 'total_value', render: (v) => <span className="font-semibold text-forest">{inr(v)}</span> },
   ];
  
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
-        <h2 className="font-display text-3xl text-forest">Delivery Challan</h2>
-        <Button onClick={() => setCreateOpen(true)}>+ New Challan</Button>
+        <h2 className="font-display text-3xl text-forest">{t('challans.title')}</h2>
+        <Button onClick={() => setCreateOpen(true)}>+ {t('challans.newChallan')}</Button>
       </div>
-      <p className="text-sm text-muted mb-6">Record purchases from farmers (crop pickup) before inventory is updated, including logistics charges.</p>
+      <p className="text-sm text-muted mb-6">{t('challans.subtitle')}</p>
  
       <div className="mb-4">
-        <Input placeholder="Search by challan number or farmer…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+        <Input placeholder={t('challans.searchPlaceholder')} value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
       </div>
  
       <DataTable
@@ -68,9 +70,9 @@ export default function DeliveryChallan() {
         actions={(row) => (
           <span className="flex gap-3 justify-end">
             <button onClick={(e) => { e.stopPropagation(); printChallan(row.id); }}
-              className="text-sage hover:text-forest text-sm hover:underline">🖨 Print</button>
-            <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete challan ${row.challan_number}?`)) deleteChallan.mutate(row.id); }}
-              className="text-red-600 text-sm hover:underline">Delete</button>
+              className="text-sage hover:text-forest text-sm hover:underline">🖨 {t('common.print')}</button>
+            <button onClick={(e) => { e.stopPropagation(); if (confirm(t('challans.confirmDelete', { number: row.challan_number }))) deleteChallan.mutate(row.id); }}
+              className="text-red-600 text-sm hover:underline">{t('common.delete')}</button>
           </span>
         )}
       />
@@ -84,6 +86,7 @@ export default function DeliveryChallan() {
 }
  
 function ChallanDetail({ challan, onClose }) {
+  const { t } = useTranslation();
   const [printing, setPrinting] = useState(false);
   return (
     <Modal onClose={onClose}>
@@ -94,17 +97,17 @@ function ChallanDetail({ challan, onClose }) {
             <p className="text-sm text-muted">{new Date(challan.challan_date).toLocaleDateString('en-IN')}</p>
           </div>
           <Button type="button" secondary onClick={() => printChallan(challan.id, setPrinting)} disabled={printing}>
-            {printing ? 'Generating…' : '🖨 Print Delivery Challan'}
+            {printing ? t('common.generating') : `🖨 ${t('challans.printChallan')}`}
           </Button>
         </div>
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div><p className="text-muted uppercase text-xs">Farmer</p><p className="font-medium">{challan.farmer?.name || challan.farmer_name || '—'}</p></div>
-          {challan.farmer?.village && <div><p className="text-muted uppercase text-xs">Village</p><p className="font-medium">{challan.farmer.village}</p></div>}
+          <div><p className="text-muted uppercase text-xs">{t('challans.farmer')}</p><p className="font-medium">{challan.farmer?.name || challan.farmer_name || '—'}</p></div>
+          {challan.farmer?.village && <div><p className="text-muted uppercase text-xs">{t('challans.village')}</p><p className="font-medium">{challan.farmer.village}</p></div>}
         </div>
         <div className="border border-border rounded-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-cream-dark text-xs text-muted uppercase">
-              <tr><th className="px-3 py-2 text-left">Product</th><th className="px-3 py-2 text-right">Qty</th><th className="px-3 py-2 text-right">Rate</th><th className="px-3 py-2 text-right">Total</th></tr>
+              <tr><th className="px-3 py-2 text-left">{t('common.product')}</th><th className="px-3 py-2 text-right">{t('common.quantity')}</th><th className="px-3 py-2 text-right">{t('common.rate')}</th><th className="px-3 py-2 text-right">{t('common.total')}</th></tr>
             </thead>
             <tbody className="divide-y divide-border">
               {(challan.items || []).map(it => (
@@ -119,17 +122,18 @@ function ChallanDetail({ challan, onClose }) {
           </table>
         </div>
         <div className="text-sm space-y-1 text-right">
-          <p><span className="text-muted mr-3">Goods value:</span> {inr(challan.goods_value)}</p>
-          <p><span className="text-muted mr-3">Challan charges (logistics):</span> {inr(challan.challan_charges)}</p>
-          <p className="font-bold text-forest"><span className="mr-3">Total purchase value:</span> {inr(challan.total_value)}</p>
+          <p><span className="text-muted mr-3">{t('challans.goodsValueLabel')}:</span> {inr(challan.goods_value)}</p>
+          <p><span className="text-muted mr-3">{t('challans.chargesLabel')}:</span> {inr(challan.challan_charges)}</p>
+          <p className="font-bold text-forest"><span className="mr-3">{t('challans.totalPurchaseValue')}:</span> {inr(challan.total_value)}</p>
         </div>
-        {challan.notes && <p className="text-sm bg-cream/50 rounded p-3"><span className="text-muted">Notes: </span>{challan.notes}</p>}
+        {challan.notes && <p className="text-sm bg-cream/50 rounded p-3"><span className="text-muted">{t('common.notes')}: </span>{challan.notes}</p>}
       </div>
     </Modal>
   );
 }
  
 function CreateChallanModal({ onClose, onSaved }) {
+  const { t } = useTranslation();
   const { data: farmers } = useQuery({
     queryKey: ['farm-farmers-min'],
     queryFn: () => apiClient.get('/admin/farm/farmers').then(r => r.data.data),
@@ -170,68 +174,68 @@ function CreateChallanModal({ onClose, onSaved }) {
       })),
     }),
     onSuccess: onSaved,
-    onError: (err) => alert(err?.response?.data?.message || 'Failed to create challan.'),
+    onError: (err) => alert(err?.response?.data?.message || t('challans.createFailed')),
   });
  
   return (
     <Modal onClose={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-4">
-        <h3 className="font-display text-xl text-forest">New Delivery Challan</h3>
+        <h3 className="font-display text-xl text-forest">{t('challans.newChallan')}</h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Farmer</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('challans.farmer')}</label>
             <select value={farmerId} onChange={e => setFarmerId(e.target.value)} className="w-full border border-border rounded-sm px-3 py-2 text-sm">
-              <option value="">Select farmer…</option>
+              <option value="">{t('challans.selectFarmer')}</option>
               {farmers?.map(f => <option key={f.id} value={f.id}>{f.name}{f.village ? ` · ${f.village}` : ''}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Date</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('common.date')}</label>
             <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
           </div>
         </div>
  
         <div>
-          <label className="block text-xs uppercase tracking-wide text-muted mb-1">Products Purchased *</label>
+          <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('challans.productsPurchased')} *</label>
           {items.map((it, i) => (
             <div key={i} className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center">
               <select required value={it.product_id} onChange={e => onProductPick(i, e.target.value)}
                 className="border border-border rounded-sm px-2 py-2 text-sm">
-                <option value="">Crop / Product…</option>
+                <option value="">{t('challans.cropProduct')}</option>
                 {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <Input required type="number" min="0.01" step="any" placeholder={`Qty (${it.unit})`}
                 value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} />
-              <Input required type="number" min="0" step="any" placeholder="₹/unit (rate)"
+              <Input required type="number" min="0" step="any" placeholder={t('challans.purchaseRate')}
                 value={it.purchase_rate} onChange={e => setItem(i, { purchase_rate: e.target.value })} />
               <button type="button" onClick={() => setItems(items.filter((_, idx) => idx !== i))}
                 disabled={items.length === 1} className="text-red-500 text-lg disabled:opacity-30">×</button>
             </div>
           ))}
           <button type="button" onClick={() => setItems([...items, { product_id: '', quantity: '', unit: 'kg', purchase_rate: '' }])}
-            className="text-sm text-sage hover:text-forest">+ Add product</button>
+            className="text-sm text-sage hover:text-forest">+ {t('challans.addProduct')}</button>
         </div>
  
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Challan Charges (₹)</label>
-            <Input type="number" min="0" step="any" placeholder="Pickup, transport, loading…" value={charges} onChange={e => setCharges(e.target.value)} />
-            <p className="text-[11px] text-muted mt-1">Logistics: crop pickup, transport to warehouse, loading/unloading, other procurement costs.</p>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('challans.challanCharges')}</label>
+            <Input type="number" min="0" step="any" placeholder={t('challans.chargesPlaceholder')} value={charges} onChange={e => setCharges(e.target.value)} />
+            <p className="text-[11px] text-muted mt-1">{t('challans.chargesHelp')}</p>
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-muted mb-1">Notes</label>
+            <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('common.notes')}</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full border border-border rounded-sm px-3 py-2 text-sm" />
           </div>
         </div>
  
         <div className="flex justify-between items-center pt-2 border-t border-border">
           <div className="text-sm">
-            <span className="text-muted">Goods: <strong>{inr(goods)}</strong></span>
-            <span className="text-muted ml-4">Total purchase value: <strong className="text-forest">{inr(total)}</strong></span>
+            <span className="text-muted">{t('challans.goods')}: <strong>{inr(goods)}</strong></span>
+            <span className="text-muted ml-4">{t('challans.totalPurchaseValue')}: <strong className="text-forest">{inr(total)}</strong></span>
           </div>
           <div className="flex gap-3">
-            <Button type="button" secondary onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={!canSubmit || save.isPending}>{save.isPending ? 'Saving…' : 'Create Challan'}</Button>
+            <Button type="button" secondary onClick={onClose}>{t('common.cancel')}</Button>
+            <Button type="submit" disabled={!canSubmit || save.isPending}>{save.isPending ? t('common.saving') : t('challans.createChallan')}</Button>
           </div>
         </div>
       </form>

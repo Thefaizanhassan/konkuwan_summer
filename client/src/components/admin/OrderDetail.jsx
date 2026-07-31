@@ -4,6 +4,7 @@ import Modal from '../ui/Modal';
 import StatusBadge from '../ui/StatusBadge';
 import Button from '../ui/Button';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { downloadInvoice, downloadQuotation } from '../../lib/invoice';
 
 const STATUS_FLOW = {
@@ -15,6 +16,7 @@ const STATUS_FLOW = {
 };
 
 export default function OrderDetail({ order, onClose }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [editingItemId, setEditingItemId] = useState(null);
   const [finalPriceInput, setFinalPriceInput] = useState('');
@@ -27,7 +29,7 @@ export default function OrderDetail({ order, onClose }) {
       await downloadInvoice(order.id);
       queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
     } catch (err) {
-      alert(err?.response?.data?.message || 'Failed to generate invoice PDF.');
+      alert(err?.response?.data?.message || t('orders.invoiceFailed'));
     } finally {
       setDownloading(false);
     }
@@ -39,7 +41,7 @@ export default function OrderDetail({ order, onClose }) {
       await downloadQuotation(order.id);
       queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
     } catch (err) {
-      alert(err?.response?.data?.message || 'Failed to generate quotation PDF.');
+      alert(err?.response?.data?.message || t('orders.quotationFailed'));
     } finally {
       setQuoting(false);
     }
@@ -73,23 +75,23 @@ export default function OrderDetail({ order, onClose }) {
       <div className="space-y-5">
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="font-display text-2xl text-forest">Order Details</h3>
+            <h3 className="font-display text-2xl text-forest">{t('orders.orderDetails')}</h3>
             <p className="text-sm text-muted mt-1">#{order.id.slice(0, 8).toUpperCase()}</p>
             {order.quotation_number && (
-              <p className="text-xs text-sage mt-0.5">Quotation: {order.quotation_number}</p>
+              <p className="text-xs text-sage mt-0.5">{t('orders.quotationRef')}: {order.quotation_number}</p>
             )}
             {order.invoice_number && (
-              <p className="text-xs text-sage">Invoice: {order.invoice_number}</p>
+              <p className="text-xs text-sage">{t('orders.invoiceRef')}: {order.invoice_number}</p>
             )}
           </div>
           <div className="flex flex-col items-end gap-2">
             <StatusBadge status={order.status} />
             <div className="flex items-center gap-2">
               <Button type="button" secondary onClick={handleQuotation} disabled={quoting}>
-                {quoting ? 'Generating…' : '📄 Generate Quotation'}
+                {quoting ? t('common.generating') : `📄 ${t('orders.generateQuotation')}`}
               </Button>
               <Button type="button" secondary onClick={handleInvoice} disabled={downloading}>
-                {downloading ? 'Generating…' : '🧾 Generate Invoice PDF'}
+                {downloading ? t('common.generating') : `🧾 ${t('orders.generateInvoice')}`}
               </Button>
             </div>
           </div>
@@ -97,35 +99,35 @@ export default function OrderDetail({ order, onClose }) {
 
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <p className="text-muted uppercase text-xs tracking-wider">Customer</p>
+            <p className="text-muted uppercase text-xs tracking-wider">{t('orders.customer')}</p>
             <p className="font-medium">{order.Customer?.company_name}</p>
           </div>
           <div>
-            <p className="text-muted uppercase text-xs tracking-wider">Order Date</p>
+            <p className="text-muted uppercase text-xs tracking-wider">{t('orders.orderDate')}</p>
             <p className="font-medium">{new Date(order.order_date).toLocaleDateString()}</p>
           </div>
           <div>
-            <p className="text-muted uppercase text-xs tracking-wider">Total Amount</p>
+            <p className="text-muted uppercase text-xs tracking-wider">{t('orders.totalAmount')}</p>
             <p className="font-medium text-forest">₹{Number(order.total_amount || 0).toLocaleString()}</p>
           </div>
           {order.final_note && (
             <div className="col-span-2">
-              <p className="text-muted uppercase text-xs tracking-wider">Notes</p>
+              <p className="text-muted uppercase text-xs tracking-wider">{t('common.notes')}</p>
               <p className="font-medium">{order.final_note}</p>
             </div>
           )}
         </div>
 
         <div>
-          <p className="text-muted uppercase text-xs tracking-wider mb-2">Line Items</p>
+          <p className="text-muted uppercase text-xs tracking-wider mb-2">{t('orders.lineItems')}</p>
           <div className="border border-border rounded-sm overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-cream-dark text-xs text-muted uppercase">
                 <tr>
-                  <th className="px-3 py-2 text-left">Product</th>
-                  <th className="px-3 py-2 text-right">Qty</th>
-                  <th className="px-3 py-2 text-right">Unit price</th>
-                  <th className="px-3 py-2 text-right">Final price</th>
+                  <th className="px-3 py-2 text-left">{t('common.product')}</th>
+                  <th className="px-3 py-2 text-right">{t('common.quantity')}</th>
+                  <th className="px-3 py-2 text-right">{t('orders.unitPrice')}</th>
+                  <th className="px-3 py-2 text-right">{t('orders.finalPrice')}</th>
                   <th className="px-3 py-2"></th>
                 </tr>
               </thead>
@@ -143,14 +145,14 @@ export default function OrderDetail({ order, onClose }) {
                             value={finalPriceInput}
                             onChange={e => setFinalPriceInput(e.target.value)}
                             className="w-24 border border-border px-2 py-1 rounded-sm text-xs"
-                            placeholder="Amount"
+                            placeholder={t('common.amount')}
                           />
                           <Button
                             type="button"
                             onClick={() => setFinalPrice.mutate({ itemId: item.id, final_price: parseFloat(finalPriceInput) })}
                             disabled={setFinalPrice.isLoading || !finalPriceInput}
                           >
-                            Save
+                            {t('common.save')}
                           </Button>
                           <Button type="button" secondary onClick={() => setEditingItemId(null)}>✕</Button>
                         </div>
@@ -166,7 +168,7 @@ export default function OrderDetail({ order, onClose }) {
                           onClick={() => { setEditingItemId(item.id); setFinalPriceInput(item.final_price || ''); }}
                           className="text-sage text-xs hover:underline"
                         >
-                          Set price
+                          {t('orders.setPrice')}
                         </button>
                       )}
                     </td>
@@ -179,7 +181,7 @@ export default function OrderDetail({ order, onClose }) {
 
         {nextStatuses.length > 0 && (
           <div className="flex gap-2 flex-wrap pt-2 border-t border-border">
-            <p className="text-sm text-muted w-full">Move to:</p>
+            <p className="text-sm text-muted w-full">{t('orders.moveTo')}</p>
             {nextStatuses.map(s => (
               <Button
                 key={s}
@@ -188,7 +190,7 @@ export default function OrderDetail({ order, onClose }) {
                 onClick={() => updateStatus.mutate({ status: s })}
                 disabled={updateStatus.isLoading}
               >
-                {s.charAt(0).toUpperCase() + s.slice(1)}
+                {t(`orders.status.${s}`)}
               </Button>
             ))}
           </div>

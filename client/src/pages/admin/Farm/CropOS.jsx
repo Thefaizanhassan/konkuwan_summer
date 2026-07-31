@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../../services/api';
 import Button from '../../../components/ui/Button';
@@ -26,6 +27,7 @@ const PALETTE = [
 function weeksFrom(d) { return !d ? 0 : Math.max(0, Math.floor((Date.now() - new Date(d)) / 604800000)); }
 
 export default function CropOS() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeCrop, setActiveCrop] = useState(null);
   const [showObsModal, setShowObsModal] = useState(false);
@@ -71,31 +73,31 @@ export default function CropOS() {
   const saveSetup = useMutation({
     mutationFn: ({ cropId, data }) => apiClient.put(`/admin/farm/crops/${cropId}`, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
-    onError: (err) => alert(err?.response?.data?.message || 'Failed to save crop setup.'),
+    onError: (err) => alert(err?.response?.data?.message || t('farm.crop.setupFailed')),
   });
  
   const deleteCropEntry = useMutation({
     mutationFn: (cropId) => apiClient.delete(`/admin/farm/crops/${cropId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
-    onError: (err) => alert(err?.response?.data?.message || 'Failed to delete crop entry.'),
+    onError: (err) => alert(err?.response?.data?.message || t('common.somethingWentWrong')),
   });
 
   const genPOP = useMutation({
     mutationFn: (cropId) => apiClient.post(`/admin/farm/crops/${cropId}/pop`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-crops'] }),
-    onError: (err) => alert(err?.response?.data?.message || 'POP generation failed.'),
+    onError: (err) => alert(err?.response?.data?.message || t('farm.crop.popFailed')),
   });
 
   const addObservation = useMutation({
     mutationFn: (data) => apiClient.post(`/admin/farm/crops/${activeCrop}/observations`, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['farm-obs', activeCrop] }),
-    onError: (err) => alert(err?.response?.data?.message || 'Failed to log observation.'),
+    onError: (err) => alert(err?.response?.data?.message || t('common.somethingWentWrong')),
   });
 
   if (crops.length === 0) {
     return (
       <div className="bg-white p-8 rounded-lg border text-center text-muted text-sm">
-        No crops yet. Crops are your <b>Products</b> — add a product in Admin → Products and it appears here automatically.
+        {t('farm.crop.noCrops')}
       </div>
     );
   }
@@ -128,13 +130,13 @@ export default function CropOS() {
               <span className="text-3xl">{crop.emoji}</span>
               <h3 className="text-xl font-bold mt-1">{crop.name}</h3>
               <p className="text-xs opacity-80">
-                {setup?.area_acres != null ? `${Number(setup.area_acres)} acres cultivated` : 'Area not set'}
-                {setup?.planting_date ? ` · Planted ${new Date(setup.planting_date).toLocaleDateString('en-IN')}` : ''}
+                {setup?.area_acres != null ? t('farm.crop.acresCultivated', { count: Number(setup.area_acres) }) : t('farm.crop.areaNotSet')}
+                {setup?.planting_date ? ` · ${t('farm.crop.planted', { date: new Date(setup.planting_date).toLocaleDateString('en-IN') })}` : ''}
               </p>
             </div>
             <div className="text-right">
               <div className="text-4xl font-mono font-bold">{weeks}</div>
-              <div className="text-xs opacity-80">weeks in</div>
+              <div className="text-xs opacity-80">{t('farm.crop.weeksIn')}</div>
             </div>
           </div>
         </div>
@@ -143,13 +145,13 @@ export default function CropOS() {
       {/* Area management — fully dynamic, stored in crop_setups.area_acres */}
       <div className="bg-white p-5 rounded border border-border">
         <div className="flex justify-between items-center">
-          <h3 className="font-display text-lg">Cultivated Area</h3>
+          <h3 className="font-display text-lg">{t('farm.crop.cultivatedArea')}</h3>
           {setup && (
             <button
-              onClick={() => { if (confirm(`Delete the ${crop?.name} crop entry (area, planting date, generated POP)? Observations are kept.`)) deleteCropEntry.mutate(activeCrop); }}
+              onClick={() => { if (confirm(t('farm.crop.confirmDeleteCrop', { name: crop?.name }))) deleteCropEntry.mutate(activeCrop); }}
               className="text-red-600 text-xs hover:underline"
             >
-              Delete crop entry
+              {t('farm.crop.deleteCropEntry')}
             </button>
           )}
         </div>
@@ -159,23 +161,23 @@ export default function CropOS() {
               type="number" min="0" step="0.25"
               value={areaDraft}
               onChange={e => setAreaDraft(e.target.value)}
-              placeholder="Acres (e.g. 4)"
+              placeholder={t('farm.crop.acresPlaceholder')}
               className="border rounded-sm p-2 flex-1"
             />
             <Button onClick={() => { saveSetup.mutate({ cropId: activeCrop, data: { area_acres: areaDraft === '' ? null : parseFloat(areaDraft) } }); setEditingArea(false); }}>
-              Save
+              {t('common.save')}
             </Button>
-            <Button secondary onClick={() => setEditingArea(false)}>Cancel</Button>
+            <Button secondary onClick={() => setEditingArea(false)}>{t('common.cancel')}</Button>
           </div>
         ) : (
           <div className="flex justify-between items-center mt-3 text-sm">
             <span>
               {setup?.area_acres != null
-                ? <><strong className="text-lg font-mono">{Number(setup.area_acres)}</strong> acres</>
-                : <span className="text-muted">No area recorded for this crop.</span>}
+                ? <><strong className="text-lg font-mono">{Number(setup.area_acres)}</strong> {t('farm.crop.acres')}</>
+                : <span className="text-muted">{t('farm.crop.noArea')}</span>}
             </span>
             <Button secondary onClick={() => { setAreaDraft(setup?.area_acres ?? ''); setEditingArea(true); }}>
-              ✎ {setup?.area_acres != null ? 'Edit area' : 'Set area'}
+              ✎ {setup?.area_acres != null ? t('farm.crop.editArea') : t('farm.crop.setArea')}
             </Button>
           </div>
         )}
@@ -184,37 +186,37 @@ export default function CropOS() {
       {/* Planting date */}
       {!setup?.planting_date ? (
         <div className="bg-white p-5 rounded border border-border">
-          <label className="block text-xs uppercase tracking-wider text-muted mb-2">Set Planting Date</label>
+          <label className="block text-xs uppercase tracking-wider text-muted mb-2">{t('farm.crop.setPlantingDate')}</label>
           <input type="date" onChange={(e) => e.target.value && saveSetup.mutate({ cropId: activeCrop, data: { planting_date: e.target.value } })}
             className="border rounded-sm p-2 w-full" />
         </div>
       ) : (
         <div className="bg-white p-3 rounded-lg border flex justify-between items-center text-sm">
-          <span>Planted: <strong>{new Date(setup.planting_date).toLocaleDateString('en-IN')}</strong></span>
-          <button onClick={() => saveSetup.mutate({ cropId: activeCrop, data: { planting_date: null } })} className="text-red-600 text-xs">Reset</button>
+          <span>{t('farm.crop.plantedOn')}: <strong>{new Date(setup.planting_date).toLocaleDateString('en-IN')}</strong></span>
+          <button onClick={() => saveSetup.mutate({ cropId: activeCrop, data: { planting_date: null } })} className="text-red-600 text-xs">{t('farm.crop.reset')}</button>
         </div>
       )}
 
       {/* POP */}
       <div className="bg-white p-5 rounded border border-border">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="font-display text-lg">Week {weeks} Field Tasks</h3>
+          <h3 className="font-display text-lg">{t('farm.crop.weekTasks', { week: weeks })}</h3>
           <Button onClick={() => genPOP.mutate(activeCrop)} disabled={genPOP.isPending || !setup?.planting_date}>
-            {genPOP.isPending ? 'Generating...' : 'Generate POP'}
+            {genPOP.isPending ? t('common.generating') : t('farm.crop.generatePop')}
           </Button>
         </div>
         {setup?.pop_json ? (
           <pre className="bg-cream p-3 rounded text-sm whitespace-pre-wrap font-sans">{setup.pop_json.text}</pre>
-        ) : <p className="text-muted text-center py-4">Set planting date and generate POP.</p>}
+        ) : <p className="text-muted text-center py-4">{t('farm.crop.popEmpty')}</p>}
       </div>
 
       {/* Observations */}
       <div className="bg-white p-5 rounded border border-border">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="font-display text-lg">Weekly Observations</h3>
-          <Button secondary onClick={() => setShowObsModal(true)}>+ Log Observation</Button>
+          <h3 className="font-display text-lg">{t('farm.crop.observations')}</h3>
+          <Button secondary onClick={() => setShowObsModal(true)}>+ {t('farm.crop.logObservation')}</Button>
         </div>
-        {observations?.length === 0 ? <p className="text-muted text-center py-4">No observations yet.</p> : (
+        {observations?.length === 0 ? <p className="text-muted text-center py-4">{t('farm.crop.noObservations')}</p> : (
           observations?.slice(0, 5).map(ob => (
             <div key={ob.id} className="border-b py-2 text-sm">
               <span className="text-muted">{ob.date} · Wk {ob.week}</span>
@@ -230,44 +232,44 @@ export default function CropOS() {
         {showObsModal && (
           <Modal onClose={() => setShowObsModal(false)}>
             <form onSubmit={(e) => { e.preventDefault(); addObservation.mutate({ ...obsForm, week: weeks }); setShowObsModal(false); }} className="space-y-3">
-              <h3 className="text-xl font-display">Log Observation</h3>
+              <h3 className="text-xl font-display">{t('farm.crop.logObservation')}</h3>
               <div>
-                <label className="text-xs uppercase tracking-wider text-muted block">Date</label>
+                <label className="text-xs uppercase tracking-wider text-muted block">{t('common.date')}</label>
                 <input type="date" value={obsForm.date} onChange={e => setObsForm({...obsForm, date: e.target.value})} className="border p-2 rounded-sm w-full" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted block">Health</label>
+                  <label className="text-xs uppercase tracking-wider text-muted block">{t('farm.crop.health')}</label>
                   <select value={obsForm.health} onChange={e => setObsForm({...obsForm, health: e.target.value})} className="border p-2 rounded-sm w-full">
                     {['Excellent','Good','Fair','Poor'].map(v => <option key={v}>{v}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted block">Pest/Disease</label>
+                  <label className="text-xs uppercase tracking-wider text-muted block">{t('farm.crop.pest')}</label>
                   <select value={obsForm.pest} onChange={e => setObsForm({...obsForm, pest: e.target.value})} className="border p-2 rounded-sm w-full">
                     <option>No</option><option>Yes - minor</option><option>Yes - serious</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted block">Water</label>
+                  <label className="text-xs uppercase tracking-wider text-muted block">{t('farm.crop.water')}</label>
                   <select value={obsForm.water} onChange={e => setObsForm({...obsForm, water: e.target.value})} className="border p-2 rounded-sm w-full">
                     <option>Good</option><option>Too dry</option><option>Waterlogged</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-muted block">Growth</label>
+                  <label className="text-xs uppercase tracking-wider text-muted block">{t('farm.crop.growth')}</label>
                   <select value={obsForm.growth} onChange={e => setObsForm({...obsForm, growth: e.target.value})} className="border p-2 rounded-sm w-full">
                     <option>On track</option><option>Faster</option><option>Slower</option><option>No growth</option>
                   </select>
                 </div>
               </div>
               <div>
-                <label className="text-xs uppercase tracking-wider text-muted block">Notes</label>
+                <label className="text-xs uppercase tracking-wider text-muted block">{t('common.notes')}</label>
                 <textarea value={obsForm.note} onChange={e => setObsForm({...obsForm, note: e.target.value})} rows={2} className="border p-2 rounded-sm w-full" />
               </div>
               <div className="flex justify-end gap-2">
-                <Button type="button" secondary onClick={() => setShowObsModal(false)}>Cancel</Button>
-                <Button type="submit" disabled={addObservation.isPending}>Save</Button>
+                <Button type="button" secondary onClick={() => setShowObsModal(false)}>{t('common.cancel')}</Button>
+                <Button type="submit" disabled={addObservation.isPending}>{t('common.save')}</Button>
               </div>
             </form>
           </Modal>

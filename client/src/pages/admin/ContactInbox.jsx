@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
- 
+import { buildReplyMailto } from '../../lib/replyTemplates';
+
 const STATUS_STYLES = {
   new: 'bg-amber-100 text-amber-800',
   read: 'bg-blue-100 text-blue-700',
@@ -15,6 +17,7 @@ const TYPE_STYLES = {
 };
  
 export default function ContactInbox() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ type: '', status: '' });
@@ -54,10 +57,10 @@ export default function ContactInbox() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <h2 className="font-display text-3xl text-forest">Inquiries</h2>
+        <h2 className="font-display text-3xl text-forest">{t('inquiries.title')}</h2>
         {newCount > 0 && (
           <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-            {newCount} new
+            {t('inquiries.newBadge', { count: newCount })}
           </span>
         )}
       </div>
@@ -69,28 +72,28 @@ export default function ContactInbox() {
           onChange={e => { setFilters(f => ({ ...f, type: e.target.value })); setPage(1); }}
           className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
         >
-          <option value="">All types</option>
-          <option value="buyer">Buyer</option>
-          <option value="investor">Investor / Partner</option>
+          <option value="">{t('inquiries.allTypes')}</option>
+          <option value="buyer">{t('inquiries.buyer')}</option>
+          <option value="investor">{t('inquiries.investor')}</option>
         </select>
         <select
           value={filters.status}
           onChange={e => { setFilters(f => ({ ...f, status: e.target.value })); setPage(1); }}
           className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
         >
-          <option value="">All statuses</option>
-          <option value="new">New</option>
-          <option value="read">Read</option>
-          <option value="replied">Replied</option>
-          <option value="archived">Archived</option>
+          <option value="">{t('inquiries.allStatuses')}</option>
+          <option value="new">{t('inquiries.statusNew')}</option>
+          <option value="read">{t('inquiries.statusRead')}</option>
+          <option value="replied">{t('inquiries.statusReplied')}</option>
+          <option value="archived">{t('inquiries.statusArchived')}</option>
         </select>
       </div>
  
       {isLoading ? (
-        <p className="text-muted">Loading…</p>
+        <p className="text-muted">{t('common.loading')}</p>
       ) : rows.length === 0 ? (
         <div className="bg-white rounded-2xl border border-border p-10 text-center text-muted">
-          No inquiries yet. Submissions from the public Contact page will appear here.
+          {t('inquiries.empty')}
         </div>
       ) : (
         <div className="space-y-3">
@@ -133,14 +136,14 @@ export default function ContactInbox() {
               {expanded === row.id && (
                 <div className="px-5 pb-5 border-t border-border pt-4">
                   <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                    <p><span className="text-muted">Email:</span>{' '}
+                    <p><span className="text-muted">{t('common.email')}:</span>{' '}
                       <a href={`mailto:${row.email}`} className="text-forest underline">{row.email}</a>
                     </p>
-                    {row.phone && <p><span className="text-muted">Phone:</span> {row.phone}</p>}
-                    {row.product && <p><span className="text-muted">Product:</span> {row.product}</p>}
-                    {row.quantity && <p><span className="text-muted">Quantity:</span> {row.quantity}</p>}
-                    {row.interest && <p><span className="text-muted">Interest:</span> {row.interest}</p>}
-                    <p><span className="text-muted">Received:</span> {new Date(row.created_at).toLocaleString()}</p>
+                    {row.phone && <p><span className="text-muted">{t('common.phone')}:</span> {row.phone}</p>}
+                    {row.product && <p><span className="text-muted">{t('common.product')}:</span> {row.product}</p>}
+                    {row.quantity && <p><span className="text-muted">{t('common.quantity')}:</span> {row.quantity}</p>}
+                    {row.interest && <p><span className="text-muted">{t('inquiries.interest')}:</span> {row.interest}</p>}
+                    <p><span className="text-muted">{t('inquiries.received')}:</span> {new Date(row.created_at).toLocaleString()}</p>
                   </div>
                   {row.message && (
                     <p className="mt-3 text-sm bg-cream/50 rounded-xl p-4 whitespace-pre-wrap">{row.message}</p>
@@ -152,7 +155,7 @@ export default function ContactInbox() {
                         onClick={() => updateStatus.mutate({ id: row.id, status: 'replied' })}
                         className="text-xs px-3 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100"
                       >
-                        ✓ Mark replied
+                        ✓ {t('inquiries.markReplied')}
                       </button>
                     )}
                     {row.status !== 'archived' && (
@@ -160,17 +163,19 @@ export default function ContactInbox() {
                         onClick={() => updateStatus.mutate({ id: row.id, status: 'archived' })}
                         className="text-xs px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100"
                       >
-                        Archive
+                        {t('inquiries.archive')}
                       </button>
                     )}
+                    {/* Opens the mail client with recipient, subject and the
+                        correct template body (buyer / investor) pre-filled. */}
                     <a
-                      href={`mailto:${row.email}?subject=Re: Your inquiry to Konkuwan Herbs`}
+                      href={buildReplyMailto(row)}
                       className="text-xs px-3 py-1.5 rounded-lg bg-forest text-white hover:bg-forest-mid"
                     >
-                      ✉ Reply by email
+                      ✉ {row.type === 'investor' ? t('inquiries.replyInvestor') : t('inquiries.replyBuyer')}
                     </a>
                     <button
-                      onClick={() => { if (confirm('Delete this inquiry permanently?')) deleteSubmission.mutate(row.id); }}
+                      onClick={() => { if (confirm(t('inquiries.confirmDelete'))) deleteSubmission.mutate(row.id); }}
                       className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 ml-auto"
                     >
                       Delete

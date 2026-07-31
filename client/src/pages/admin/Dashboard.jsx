@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import apiClient from '../../services/api';
@@ -65,6 +66,7 @@ function KPICard({ label, value, trend, trendUp }) {
 const fmtTrend = (t) => (t == null ? null : `${t > 0 ? '+' : ''}${t}%`);
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
@@ -111,14 +113,14 @@ export default function Dashboard() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-display text-3xl" style={{ color: '#1c2e1f' }}>
-            Dashboard <small className="font-body text-base font-normal ml-2" style={{ color: '#7b8a76' }}>Konkuwan Herbs</small>
+            {t('dashboard.title')} <small className="font-body text-base font-normal ml-2" style={{ color: '#7b8a76' }}>Konkuwan Herbs</small>
           </h1>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold" style={{ color: '#1c2e1f' }}>Welcome, {name}</p>
-            <p className="text-xs capitalize" style={{ color: '#7b8a76' }}>
-              {user?.profile?.role?.replace(/_/g, ' ') || 'Admin'}
+            <p className="text-sm font-semibold" style={{ color: '#1c2e1f' }}>{t('dashboard.welcome', { name })}</p>
+            <p className="text-xs" style={{ color: '#7b8a76' }}>
+              {user?.profile?.role ? t(`users.roles.${user.profile.role}`, user.profile.role.replace(/_/g, ' ')) : 'Admin'}
             </p>
           </div>
           <div
@@ -133,17 +135,17 @@ export default function Dashboard() {
       {/* KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
         <KPICard
-          label="Revenue (MTD)"
+          label={t('dashboard.revenueMtd')}
           value={`₹${Number(kpi.revenue_mtd || 0).toLocaleString('en-IN')}`}
           trend={fmtTrend(kpi.revenue_trend)} trendUp={(kpi.revenue_trend ?? 0) >= 0}
         />
         <KPICard
-          label="Orders (MTD)"
+          label={t('dashboard.ordersMtd')}
           value={kpi.orders_mtd ?? 0}
           trend={fmtTrend(kpi.orders_trend)} trendUp={(kpi.orders_trend ?? 0) >= 0}
         />
         <KPICard
-          label="Total Customers"
+          label={t('dashboard.totalCustomers')}
           value={kpi.total_customers ?? 0}
           trend={fmtTrend(kpi.customers_trend)} trendUp={(kpi.customers_trend ?? 0) >= 0}
         />
@@ -152,12 +154,12 @@ export default function Dashboard() {
       {/* Operational overview */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         {[
-          { label: 'Products', value: `${overview.products_active ?? 0}/${overview.products_total ?? 0}`, sub: 'available / total', to: '/admin/products' },
-          { label: 'Potential Leads', value: overview.potential_leads ?? 0, sub: 'customers pipeline', to: '/admin/customers' },
-          { label: 'New Inquiries', value: overview.inquiries_new ?? 0, sub: `${overview.inquiries_total ?? 0} total`, to: '/admin/inquiries', alert: (overview.inquiries_new ?? 0) > 0 },
-          { label: 'Farmers', value: overview.farmers_total ?? 0, sub: `${Number(overview.farm_area_decimal || 0).toFixed(0)} dec enrolled`, to: '/admin/farm' },
-          { label: 'Cultivated', value: `${Number(overview.cultivated_acres || 0)} ac`, sub: `${overview.crops_tracked ?? 0} crops tracked`, to: '/admin/farm' },
-          { label: 'Farm Expenses (MTD)', value: `₹${Number(overview.expenses_mtd || 0).toLocaleString('en-IN')}`, sub: `₹${Number(overview.farm_revenue_logged_mtd || 0).toLocaleString('en-IN')} farm revenue`, to: '/admin/farm' },
+          { label: t('dashboard.productsCard'), value: `${overview.products_active ?? 0}/${overview.products_total ?? 0}`, sub: t('dashboard.productsSub'), to: '/admin/products' },
+          { label: t('dashboard.potentialLeads'), value: overview.potential_leads ?? 0, sub: t('dashboard.potentialLeadsSub'), to: '/admin/customers' },
+          { label: t('dashboard.newInquiries'), value: overview.inquiries_new ?? 0, sub: t('dashboard.inquiriesSub', { count: overview.inquiries_total ?? 0 }), to: '/admin/inquiries', alert: (overview.inquiries_new ?? 0) > 0 },
+          { label: t('dashboard.farmers'), value: overview.farmers_total ?? 0, sub: t('dashboard.farmersSub', { count: Number(overview.farm_area_decimal || 0).toFixed(0) }), to: '/admin/farm' },
+          { label: t('dashboard.cultivated'), value: `${Number(overview.cultivated_acres || 0)} ac`, sub: t('dashboard.cultivatedSub', { count: overview.crops_tracked ?? 0 }), to: '/admin/farm' },
+          { label: t('dashboard.farmExpenses'), value: `₹${Number(overview.expenses_mtd || 0).toLocaleString('en-IN')}`, sub: t('dashboard.farmExpensesSub', { amount: `₹${Number(overview.farm_revenue_logged_mtd || 0).toLocaleString('en-IN')}` }), to: '/admin/farm' },
         ].map(card => (
           <Link key={card.label} to={card.to}
             className="rounded-2xl p-4 block hover:shadow-md transition"
@@ -173,16 +175,16 @@ export default function Dashboard() {
       {/* Needs attention */}
       {((overview.inquiries_new ?? 0) > 0 || (overview.draft_orders ?? 0) > 0 || (overview.farmers_needing_visit ?? 0) > 0) && (
         <div className="rounded-2xl p-5 mb-8" style={{ background: '#FFF8EC', border: '1px solid #f3d9a4' }}>
-          <h3 className="font-display text-lg mb-2" style={{ color: '#7c4a03' }}>⚠ Needs attention</h3>
+          <h3 className="font-display text-lg mb-2" style={{ color: '#7c4a03' }}>⚠ {t('dashboard.needsAttention')}</h3>
           <ul className="text-sm space-y-1" style={{ color: '#7c4a03' }}>
             {(overview.inquiries_new ?? 0) > 0 && (
-              <li><Link to="/admin/inquiries" className="underline">{overview.inquiries_new} new inquir{overview.inquiries_new === 1 ? 'y' : 'ies'}</Link> waiting for a reply</li>
+              <li><Link to="/admin/inquiries" className="underline">{t('dashboard.attentionInquiries', { count: overview.inquiries_new })}</Link></li>
             )}
             {(overview.draft_orders ?? 0) > 0 && (
-              <li><Link to="/admin/orders" className="underline">{overview.draft_orders} draft order{overview.draft_orders === 1 ? '' : 's'}</Link> not yet confirmed</li>
+              <li><Link to="/admin/orders" className="underline">{t('dashboard.attentionDrafts', { count: overview.draft_orders })}</Link></li>
             )}
             {(overview.farmers_needing_visit ?? 0) > 0 && (
-              <li><Link to="/admin/farm" className="underline">{overview.farmers_needing_visit} farmer{overview.farmers_needing_visit === 1 ? '' : 's'}</Link> not visited in 2+ weeks</li>
+              <li><Link to="/admin/farm" className="underline">{t('dashboard.attentionVisits', { count: overview.farmers_needing_visit })}</Link></li>
             )}
           </ul>
         </div>
@@ -193,10 +195,10 @@ export default function Dashboard() {
         {/* Chart */}
         <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>Revenue Last 12 Months</h3>
+            <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>{t('dashboard.revenue12')}</h3>
             <div className="flex items-center gap-2 text-xs" style={{ color: '#5f7059' }}>
               <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#2a5e3a' }} />
-              Monthly revenue
+              {t('dashboard.monthlyRevenue')}
             </div>
           </div>
           <div style={{ height: 220 }}>
@@ -221,16 +223,16 @@ export default function Dashboard() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-sm text-muted">No revenue data yet</div>
+              <div className="flex items-center justify-center h-full text-sm text-muted">{t('dashboard.noRevenue')}</div>
             )}
           </div>
         </div>
 
         {/* Top Products */}
         <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
-          <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>Top Products</h3>
+          <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>{t('dashboard.topProducts')}</h3>
           {topProducts.length === 0 ? (
-            <p className="text-sm text-muted text-center py-8">No sales data yet</p>
+            <p className="text-sm text-muted text-center py-8">{t('dashboard.noSales')}</p>
           ) : (
             <ul className="divide-y" style={{ borderColor: '#f0ebe2' }}>
               {topProducts.map((p, i) => (
@@ -255,9 +257,9 @@ export default function Dashboard() {
       {(expenseCats.length > 0 || farmersByCrop.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 mb-8">
           <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
-            <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>Expenses by Category</h3>
+            <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>{t('dashboard.expensesByCategory')}</h3>
             {expenseCats.length === 0 ? (
-              <p className="text-sm text-muted text-center py-8">No expense data yet</p>
+              <p className="text-sm text-muted text-center py-8">{t('dashboard.noExpenses')}</p>
             ) : (
               <>
                 <div style={{ height: 220 }}>
@@ -292,10 +294,10 @@ export default function Dashboard() {
           </div>
 
           <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
-            <h3 className="font-display text-xl mb-1" style={{ color: '#1c2e1f' }}>Farmers by Crop</h3>
-            <p className="text-xs mb-4" style={{ color: '#7b8a76' }}>Total enrolled: {farmData?.total_farmers ?? 0}</p>
+            <h3 className="font-display text-xl mb-1" style={{ color: '#1c2e1f' }}>{t('dashboard.farmersByCrop')}</h3>
+            <p className="text-xs mb-4" style={{ color: '#7b8a76' }}>{t('dashboard.totalEnrolled', { count: farmData?.total_farmers ?? 0 })}</p>
             {farmersByCrop.length === 0 ? (
-              <p className="text-sm text-muted text-center py-8">No farmers enrolled yet</p>
+              <p className="text-sm text-muted text-center py-8">{t('dashboard.noFarmers')}</p>
             ) : (
               <div style={{ height: 260 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -316,9 +318,9 @@ export default function Dashboard() {
       {/* Order pipeline + Recent activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 mb-8">
         <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
-          <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>Order Pipeline</h3>
+          <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>{t('dashboard.orderPipeline')}</h3>
           {statusDist.length === 0 ? (
-            <p className="text-sm text-muted text-center py-8">No orders yet</p>
+            <p className="text-sm text-muted text-center py-8">{t('dashboard.noOrders')}</p>
           ) : (
             <div style={{ height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -338,13 +340,13 @@ export default function Dashboard() {
  
         <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>Recent Activity</h3>
+            <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>{t('dashboard.recentActivity')}</h3>
             <Link to="/admin/audit-logs" className="text-sm font-medium" style={{ color: '#4a6a4f', borderBottom: '1px dashed #b7cbb0' }}>
-              All logs →
+              {t('dashboard.allLogs')} →
             </Link>
           </div>
           {recentActivity.length === 0 ? (
-            <p className="text-sm text-muted text-center py-8">No activity recorded yet</p>
+            <p className="text-sm text-muted text-center py-8">{t('dashboard.noActivity')}</p>
           ) : (
             <ul className="divide-y" style={{ borderColor: '#f0ebe2' }}>
               {recentActivity.map((a, i) => (
@@ -371,23 +373,23 @@ export default function Dashboard() {
       {/* Recent Orders */}
       <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
         <div className="flex items-center justify-between mb-5">
-          <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>Recent Orders</h3>
+          <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>{t('dashboard.recentOrders')}</h3>
           <Link to="/admin/orders" className="text-sm font-medium" style={{ color: '#4a6a4f', borderBottom: '1px dashed #b7cbb0' }}>
-            View all →
+            {t('dashboard.viewAll')} →
           </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #ece6dc' }}>
-                {['Customer', 'Status', 'Total', 'Date'].map(h => (
+                {[t('dashboard.customer'), t('common.status'), t('common.total'), t('common.date')].map(h => (
                   <th key={h} className="text-left pb-3 font-semibold text-xs uppercase tracking-wide pr-4" style={{ color: '#52674c' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {recentOrders.length === 0 ? (
-                <tr><td colSpan={4} className="py-8 text-center text-sm text-muted">No orders yet</td></tr>
+                <tr><td colSpan={4} className="py-8 text-center text-sm text-muted">{t('dashboard.noOrders')}</td></tr>
               ) : recentOrders.map((order, i) => (
                 <tr key={order.id}
                   className="transition-colors"
@@ -439,9 +441,9 @@ export default function Dashboard() {
     <div>
       <h2 className="font-display text-3xl text-forest mb-8">Dashboard</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <KPICard title="Revenue (MTD)" value={`₹${kpi.revenue_mtd.toLocaleString()}`} />
-        <KPICard title="Orders (MTD)" value={kpi.orders_mtd} />
-        <KPICard title="Total Customers" value={kpi.total_customers} />
+        <KPICard title={t('dashboard.revenueMtd')} value={`₹${kpi.revenue_mtd.toLocaleString()}`} />
+        <KPICard title={t('dashboard.ordersMtd')} value={kpi.orders_mtd} />
+        <KPICard title={t('dashboard.totalCustomers')} value={kpi.total_customers} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">

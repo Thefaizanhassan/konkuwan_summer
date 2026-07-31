@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
 import Button from '../../components/ui/Button';
@@ -7,8 +8,8 @@ import Button from '../../components/ui/Button';
 // `settings` table. Add a field here and it becomes editable.
 const SECTIONS = [
   {
-    title: 'Company Profile',
-    description: 'Used on invoices and the public site.',
+    title: 'Company Profile', titleKey: 'settings.sections.company',
+    description: 'Used on invoices and the public site.', descKey: 'settings.sections.companyDesc',
     icon: '🏢',
     fields: [
       { key: 'company_name', label: 'Company Name', placeholder: 'Konkuwan Herbs' },
@@ -20,8 +21,8 @@ const SECTIONS = [
     ],
   },
   {
-    title: 'Bank Details (Invoice)',
-    description: 'Shown in the Bank Details panel on generated invoices.',
+    title: 'Bank Details (Invoice)', titleKey: 'settings.sections.bank',
+    description: 'Shown in the Bank Details panel on generated invoices.', descKey: 'settings.sections.bankDesc',
     icon: '🏦',
     fields: [
       { key: 'bank_account_name', label: 'Account Holder Name', placeholder: 'Konkuwan Herbs' },
@@ -32,8 +33,8 @@ const SECTIONS = [
     ],
   },
   {
-    title: 'AI Assistant',
-    description: 'Provider used for Farm Ops AI features (POP generation, War Room briefs). API keys stay on the server in .env — only the choice of provider is stored here.',
+    title: 'AI Assistant', titleKey: 'settings.sections.ai',
+    description: 'Provider used for Farm Ops AI features.', descKey: 'settings.sections.aiDesc',
     icon: '🤖',
     fields: [
       {
@@ -48,8 +49,8 @@ const SECTIONS = [
     ],
   },
   {
-    title: 'Farm Finance',
-    description: 'Drives the EMI alert and "safe deploy" figure in Farm Ops → Finance.',
+    title: 'Farm Finance', titleKey: 'settings.sections.farmFinance',
+    description: 'Drives the EMI alert and "safe deploy" figure.', descKey: 'settings.sections.farmFinanceDesc',
     icon: '💰',
     fields: [
       { key: 'emi_monthly_amount', label: 'Monthly EMI (₹)', type: 'number', placeholder: 'e.g. 646532' },
@@ -58,8 +59,8 @@ const SECTIONS = [
     ],
   },
   {
-    title: 'Invoicing',
-    description: 'Defaults applied when generating invoices.',
+    title: 'Invoicing', titleKey: 'settings.sections.invoicing',
+    description: 'Defaults applied when generating invoices.', descKey: 'settings.sections.invoicingDesc',
     icon: '🧾',
     fields: [
       { key: 'invoice_due_days', label: 'Payment Due (days)', type: 'number', placeholder: '30' },
@@ -73,6 +74,7 @@ const SECTIONS = [
 const KNOWN_KEYS = new Set(SECTIONS.flatMap(s => s.fields.map(f => f.key)));
 
 export default function Settings() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['settings'],
@@ -96,7 +98,7 @@ export default function Settings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     },
-    onError: (err) => alert(err?.response?.data?.message || 'Failed to save settings.'),
+    onError: (err) => alert(err?.response?.data?.message || t('settings.saveFailed')),
   });
 
   const handleChange = (key, value) => {
@@ -107,7 +109,7 @@ export default function Settings() {
   const isDirty = data && JSON.stringify(form) !== JSON.stringify(data.data);
   const otherKeys = Object.keys(form).filter(k => !KNOWN_KEYS.has(k));
  
-  if (isLoading) return <p className="text-muted">Loading settings…</p>;
+  if (isLoading) return <p className="text-muted">{t('common.loading')}</p>;
  
   const renderField = (f) => {
     const val = form[f.key] ?? '';
@@ -115,7 +117,7 @@ export default function Settings() {
     if (f.type === 'select') {
       return (
         <select value={val} onChange={e => handleChange(f.key, e.target.value)} className={base}>
-          <option value="">Select…</option>
+          <option value="">{t('settings.select')}</option>
           {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       );
@@ -129,8 +131,8 @@ export default function Settings() {
   return (
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="font-display text-3xl text-forest">System Settings</h2>
-        {saved && <span className="text-sm text-green-700 bg-green-50 px-3 py-1 rounded-full">✓ Saved</span>}
+        <h2 className="font-display text-3xl text-forest">{t('settings.title')}</h2>
+        {saved && <span className="text-sm text-green-700 bg-green-50 px-3 py-1 rounded-full">✓ {t('common.saved')}</span>}
       </div>
  
       <form
@@ -140,13 +142,13 @@ export default function Settings() {
         {SECTIONS.map(section => (
           <div key={section.title} className="bg-white rounded-2xl border border-border overflow-hidden">
             <div className="px-6 py-4 border-b border-border bg-cream/40">
-              <h3 className="font-display text-lg text-forest">{section.icon} {section.title}</h3>
-              <p className="text-xs text-muted mt-1">{section.description}</p>
+              <h3 className="font-display text-lg text-forest">{section.icon} {t(section.titleKey, section.title)}</h3>
+              <p className="text-xs text-muted mt-1">{t(section.descKey, section.description)}</p>
             </div>
             <div className="p-6 grid sm:grid-cols-2 gap-4">
               {section.fields.map(f => (
                 <div key={f.key} className={f.span === 2 ? 'sm:col-span-2' : ''}>
-                  <label className="block text-xs uppercase tracking-wide text-muted mb-1">{f.label}</label>
+                  <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t(`settings.fields.${f.key}`, f.label)}</label>
                   {renderField(f)}
                 </div>
               ))}
@@ -167,8 +169,8 @@ export default function Settings() {
         {otherKeys.length > 0 && (
           <div className="bg-white rounded-2xl border border-border overflow-hidden">
             <div className="px-6 py-4 border-b border-border bg-cream/40">
-              <h3 className="font-display text-lg text-forest">🔧 Other Settings</h3>
-              <p className="text-xs text-muted mt-1">Keys stored in the database that are not part of the sections above.</p>
+              <h3 className="font-display text-lg text-forest">🔧 {t('settings.otherSettings')}</h3>
+              <p className="text-xs text-muted mt-1">{t('settings.otherDesc')}</p>
             </div>
             <div className="p-6 grid sm:grid-cols-2 gap-4">
               {otherKeys.map(key => (
@@ -187,7 +189,7 @@ export default function Settings() {
  
         <div className="flex items-center gap-3 pb-8">
           <Button type="submit" disabled={updateSettings.isPending || !isDirty}>
-            {updateSettings.isPending ? 'Saving…' : 'Save Settings'}
+            {updateSettings.isPending ? t('common.saving') : t('settings.saveSettings')}
           </Button>
           {isDirty && (
             <button
@@ -195,7 +197,7 @@ export default function Settings() {
               onClick={() => setForm(data.data)}
               className="text-sm text-muted hover:text-forest underline"
             >
-              Discard changes
+              {t('settings.discardChanges')}
             </button>
           )}
         </div>

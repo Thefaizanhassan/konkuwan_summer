@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../../services/api';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 
 export default function WarRoom() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [weekRef, setWeekRef] = useState('');
   const [brief, setBrief] = useState(null);
@@ -16,7 +18,7 @@ export default function WarRoom() {
       // The brief is stored in war_room_briefs — refresh the saved list below
       queryClient.invalidateQueries({ queryKey: ['warroom-briefs'] });
     },
-    onError: (err) => alert(err?.response?.data?.message || 'Brief generation failed.'),
+    onError: (err) => alert(err?.response?.data?.message || t('farm.warroom.failed')),
   });
 
   const { data: pastBriefs } = useQuery({
@@ -27,11 +29,11 @@ export default function WarRoom() {
   return (
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-lg border">
-        <h3 className="font-display text-lg mb-3">Monday War Room Brief</h3>
-        <Input placeholder="Week reference (e.g. Week 4 - May 2026)" value={weekRef} onChange={e => setWeekRef(e.target.value)} />
+        <h3 className="font-display text-lg mb-3">{t('farm.warroom.title')}</h3>
+        <Input placeholder={t('farm.warroom.weekRef')} value={weekRef} onChange={e => setWeekRef(e.target.value)} />
         <div className="mt-3">
           <Button onClick={() => generateBrief.mutate()} disabled={generateBrief.isPending} fullWidth>
-            {generateBrief.isPending ? 'Generating...' : 'Generate Monday Brief'}
+            {generateBrief.isPending ? t('farm.warroom.generating') : t('farm.warroom.generate')}
           </Button>
         </div>
       </div>
@@ -39,7 +41,7 @@ export default function WarRoom() {
       {/* Saved briefs (from the database) */}
       {pastBriefs?.length > 0 && (
         <div className="bg-white p-4 rounded-lg border">
-          <h4 className="font-display text-lg mb-2">Saved Briefs</h4>
+          <h4 className="font-display text-lg mb-2">{t('farm.warroom.savedBriefs')}</h4>
           <div className="divide-y divide-border">
             {pastBriefs.map(b => (
               <button
@@ -49,7 +51,7 @@ export default function WarRoom() {
                 className="w-full flex items-center justify-between py-2 text-left text-sm hover:bg-cream/40 px-2 rounded"
               >
                 <span>
-                  <span className="font-medium">{b.week_ref || 'Untitled week'}</span>
+                  <span className="font-medium">{b.week_ref || t('farm.warroom.untitledWeek')}</span>
                   <span className="text-xs text-muted ml-2">{new Date(b.created_at).toLocaleString('en-IN')}</span>
                 </span>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
@@ -67,7 +69,7 @@ export default function WarRoom() {
         <div className={`p-5 rounded-xl text-white ${
           brief.overallStatus === 'GREEN' ? 'bg-green-700' : brief.overallStatus === 'AMBER' ? 'bg-yellow-600' : 'bg-red-700'
         }`}>
-          <p className="text-xs uppercase tracking-widest opacity-80">Project Health</p>
+          <p className="text-xs uppercase tracking-widest opacity-80">{t('farm.warroom.projectHealth')}</p>
           <p className="text-3xl font-bold mt-1">{brief.overallStatus}</p>
           <p className="mt-2">{brief.headline}</p>
         </div>
@@ -77,7 +79,7 @@ export default function WarRoom() {
         <div className="space-y-4">
           {/* Crops */}
           <div className="bg-white p-4 rounded-lg border">
-            <h4 className="font-display text-lg mb-3">Crop Status</h4>
+            <h4 className="font-display text-lg mb-3">{t('farm.warroom.cropStatus')}</h4>
             {brief.crops?.map(c => (
               <div key={c.name} className="flex items-center gap-3 py-2 border-b last:border-0">
                 <span className={`w-3 h-3 rounded-full ${
@@ -93,7 +95,7 @@ export default function WarRoom() {
 
           {/* Actions */}
           <div className="bg-white p-4 rounded-lg border">
-            <h4 className="font-display text-lg mb-3">Top Actions</h4>
+            <h4 className="font-display text-lg mb-3">{t('farm.warroom.topActions')}</h4>
             {brief.actions?.map(a => (
               <div key={a.priority} className="flex gap-3 mb-3 pb-3 border-b last:border-0">
                 <span className="w-8 h-8 rounded-full bg-forest text-white flex items-center justify-center font-bold text-sm">{a.priority}</span>
@@ -108,12 +110,12 @@ export default function WarRoom() {
           {/* Risks */}
           {brief.risks?.length > 0 && (
             <div className="bg-white p-4 rounded-lg border">
-              <h4 className="font-display text-lg mb-3">Risk Radar</h4>
+              <h4 className="font-display text-lg mb-3">{t('farm.warroom.riskRadar')}</h4>
               {brief.risks.map((r, i) => (
                 <div key={i} className={`p-3 rounded-lg mb-2 ${r.level === 'HIGH' ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'}`}>
-                  <p className="text-xs font-bold uppercase mb-1">{r.level} RISK</p>
+                  <p className="text-xs font-bold uppercase mb-1">{r.level} {t('farm.warroom.risk')}</p>
                   <p className="font-semibold">{r.risk}</p>
-                  <p className="text-sm mt-1">Fix: {r.fix}</p>
+                  <p className="text-sm mt-1">{t('farm.warroom.fix')}: {r.fix}</p>
                 </div>
               ))}
             </div>
@@ -121,7 +123,7 @@ export default function WarRoom() {
 
           {brief.founderDecision && (
             <div className="bg-forest p-4 rounded-xl text-white">
-              <p className="text-xs uppercase tracking-widest opacity-70">Decision Required</p>
+              <p className="text-xs uppercase tracking-widest opacity-70">{t('farm.warroom.decisionRequired')}</p>
               <p className="mt-1">{brief.founderDecision}</p>
             </div>
           )}
