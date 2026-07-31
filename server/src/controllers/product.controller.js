@@ -1,6 +1,7 @@
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
+const config = require('../config');
 const { createProductSchema, updateProductSchema } = require('../validations/product.validation');
 
 const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -152,7 +153,23 @@ exports.uploadProductImages = async (req, res, next) => {
     const { data: last } = await supabase.from('product_images').select('sort_order').eq('product_id', req.params.id).order('sort_order', { ascending: false }).limit(1);
     let next0 = last && last.length ? last[0].sort_order + 1 : 0;
     const { count } = await supabase.from('product_images').select('id', { count: 'exact', head: true }).eq('product_id', req.params.id);
-    const rows = files.map((f, i) => ({ product_id: req.params.id, url: `/uploads/products/${f.filename}`, alt_text: f.originalname, is_primary: (count || 0) === 0 && i === 0, sort_order: next0 + i }));
+    // Upload each buffer to Supabase Storage and store the public URL. Local
+    // disk is not an option — Workers has no persistent filesystem.
+    const bucket = config.upload.bucket;
+    const uploaded = [];
+    for (const [i, f] of files.entries()) {
+      const safeName = f.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const key = `${req.params.id}/${Date.now()}-${i}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from(bucket)
+        .upload(key, f.buffer, { contentType: f.mimetype, upsert: false });
+      if (upErr) return next(new AppError(`Image upload failed: ${upErr.message}`, 500));
+      uploaded.push({
+        url: supabase.storage.from(bucket).getPublicUrl(key).data.publicUrl,
+        alt_text: f.originalname,
+      });
+    }
+    const rows = uploaded.map((u, i) => ({ product_id: req.params.id, url: u.url, alt_text: u.alt_text, is_primary: (count || 0) === 0 && i === 0, sort_order: next0 + i }));
     const { data, error } = await supabase.from('product_images').insert(rows).select();
     if (error) return next(new AppError(error.message, 500));
     await auditLog({ user: req.user, action: 'UPDATE', entity_type: 'product', entity_id: req.params.id, new_values: { images_added: rows.length }, ip_address: req.ip });

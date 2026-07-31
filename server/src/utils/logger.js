@@ -1,46 +1,28 @@
-const { createLogger, format, transports } = require('winston');
-const path = require('path');
+// Cloudflare Workers has no persistent filesystem, so the previous Winston
+// file transports (logs/error.log, logs/combined.log) wrote to nothing.
+// Workers Logs captures console output automatically, so a console sink is the
+// correct destination. The logger.info/warn/error/debug surface is unchanged,
+// so every existing call site keeps working.
+const LEVELS = ['error', 'warn', 'info', 'debug'];
+const threshold = LEVELS.indexOf(
+  process.env.NODE_ENV === 'production' ? 'info' : 'debug'
+);
 
-const logDir = path.join(__dirname, '..', '..', 'logs');
+const emit = (level, args) => {
+  if (LEVELS.indexOf(level) > threshold) return;
+  const meta = {
+    level,
+    service: 'konkuwan-api',
+    timestamp: new Date().toISOString(),
+  };
+  // console.debug is not surfaced by every runtime — fall back to console.log.
+  const sink = level === 'debug' ? console.log : console[level];
+  sink(JSON.stringify(meta), ...args);
+};
 
-const logger = createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-  format: format.combine(
-    format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    format.errors({ stack: true }),
-    format.json()
-  ),
-  defaultMeta: { service: 'konkuwan-api' },
-  transports: [
-    // Write all logs with importance `error` or less to `error.log`
-    new transports.File({
-      filename: path.join(logDir, 'error.log'),
-      level: 'error',
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    }),
-    // Write all logs with level `info` and below to `combined.log`
-    new transports.File({
-      filename: path.join(logDir, 'combined.log'),
-      maxsize: 5242880,
-      maxFiles: 10,
-    }),
-  ],
-});
-
-// If not in production, also log to the console with simple format
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(
-    new transports.Console({
-      format: format.combine(
-        format.colorize(),
-        format.timestamp({ format: 'HH:mm:ss' }),
-        format.printf(({ timestamp, level, message, stack }) => {
-          return `${timestamp} ${level}: ${stack || message}`;
-        })
-      ),
-    })
-  );
-}
-
-module.exports = logger;
+module.exports = {
+  error: (...args) => emit('error', args),
+  warn: (...args) => emit('warn', args),
+  info: (...args) => emit('info', args),
+  debug: (...args) => emit('debug', args),
+};

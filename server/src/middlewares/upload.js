@@ -1,20 +1,12 @@
 const multer = require('multer');
-const path = require('path');
 const AppError = require('../utils/AppError');
+const config = require('../config');
 
-// Define storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '..', '..', 'uploads', 'products'));
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `product-${uniqueSuffix}${ext}`);
-  },
-});
-
-// File filter – only images
+// Memory storage, not disk storage. Cloudflare Workers exposes only a virtual,
+// per-request filesystem — anything written to disk is discarded when the
+// request ends, so multer.diskStorage would report success and silently lose
+// every upload. The buffer is handed straight to Supabase Storage instead
+// (see product.controller.js → uploadProductImages).
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (allowedTypes.includes(file.mimetype)) {
@@ -25,10 +17,8 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB
-  },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: config.upload.maxFileSize },
   fileFilter,
 });
 

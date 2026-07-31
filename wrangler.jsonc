@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "konkuwan-summer",
+  "main": "worker.js",
+ 
+  // node:http (and therefore Express) requires nodejs_compat with a
+  // compatibility date of 2025-08-15 or later.
+  "compatibility_date": "2026-07-30",
+  "compatibility_flags": ["nodejs_compat"],
+ 
+  "assets": {
+    // The BUILT output, not the source directory. Pointing this at "client"
+    // uploads node_modules and serves the unprocessed Vite index.html, which
+    // renders a blank page.
+    "directory": "client/dist",
+ 
+    // Client-side routes such as /admin/orders must return index.html
+    // rather than 404.
+    "not_found_handling": "single-page-application",
+ 
+    // Everything except /api/* is served straight from the asset store without
+    // invoking the Worker.
+    "run_worker_first": ["/api/*"]
+  },
+ 
+  "vars": {
+    "NODE_ENV": "production",
+    "AI_PROVIDER": "claude"
+  },
+ 
+  "observability": { "enabled": true }
+}

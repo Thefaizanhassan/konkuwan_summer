@@ -2,11 +2,11 @@
 node_modules/
 
 # ── Environment files ─────────────────────────────
+# Broad glob: the previous list missed "client/.env.local " (trailing space),
+# which left a real file tracked in git.
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # ── Logs ─────────────────────────────────────────
 server/logs/
@@ -49,3 +49,5 @@ vite.config.js.timestamp-*
 # ── Secrets / keys ───────────────────────────────
 # supabase-service-key.json
 
+# Cloudflare Wrangler
+.wrangler/

@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
 
-const API_BASE =
-  import.meta.env.VITE_API_URL || 'http://localhost:5500/api';
+// Same-origin by default: the SPA and the API ship in one Worker, so a
+// relative path is correct in dev (via the Vite proxy), preview and
+// production. Override only for a split deployment.
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE,

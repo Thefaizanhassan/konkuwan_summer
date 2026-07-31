@@ -6,6 +6,11 @@ import { visualizer } from 'rollup-plugin-visualizer';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), visualizer({ open: false })],
+  // The client calls a relative /api in every environment; in dev this proxy
+  // forwards it to the local Express server.
+  server: {
+    proxy: { '/api': { target: 'http://localhost:5500', changeOrigin: true } },
+  },
   test: {
     globals: true,
     environment: 'jsdom',
