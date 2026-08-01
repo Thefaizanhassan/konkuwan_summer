@@ -1,3 +1,7 @@
+// MUST come first: this runs dotenv.config(), and modules required below
+// read process.env while they are being loaded.
+require('./config');
+
 const express = require('express');
 
 const meRoutes = require('./routes/me.routes');
@@ -27,7 +31,7 @@ const contactAdminRoutes = require('./routes/contact.admin.routes');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 
-const config = require('./config');
+// const config = require('./config');
 const logger = require('./utils/logger');
 const AppError = require('./utils/AppError');
 const notFound = require('./middlewares/notFound');

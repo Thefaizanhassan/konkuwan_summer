@@ -1,4 +1,11 @@
-require('dotenv').config();
+// require('dotenv').config();
+// Local Node only. Resolve server/.env explicitly rather than relying on the
+// working directory, so the server starts the same way from server/ or the
+// repo root. On Cloudflare Workers there is no .env file and no __dirname —
+// the values arrive on process.env from the Worker's vars and secrets.
+if (typeof __dirname !== 'undefined') {
+  require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
+}
 
 const config = {
   env: process.env.NODE_ENV || 'development',

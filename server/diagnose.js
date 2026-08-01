@@ -48,7 +48,19 @@ function keyRole(key) {
   }
   if (fatal) { console.log('\nStopping: fix the above first.\n'); process.exit(1); }
  
-  head('2. Supabase REST reachable, and the key bypasses RLS');
+  head('2. DNS + TCP to Supabase');
+  const host = new URL(url).hostname;
+  try {
+    const { lookup } = require('dns').promises;
+    const addrs = await lookup(host, { all: true });
+    ok(`DNS ${host} -> ${addrs.map((a) => a.address).join(', ')}`);
+  } catch (e) {
+    bad(`DNS lookup for ${host} failed — ${e.code || e.message}`);
+    console.log('        Your machine cannot resolve the Supabase host. Check your');
+    console.log('        internet connection, VPN, or DNS settings.');
+  }
+ 
+  head('3. Supabase REST reachable, and the key bypasses RLS');
   // Hitting PostgREST directly removes supabase-js from the picture.
   for (const table of ['products', 'customers', 'orders', 'profiles']) {
     try {
@@ -70,32 +82,39 @@ function keyRole(key) {
         bad(`${table.padEnd(10)} HTTP ${res.status} — ${body.slice(0, 160)}`);
       }
     } catch (e) {
-      bad(`${table.padEnd(10)} request failed — ${e.message}`);
+      // Node reports every network failure as "fetch failed"; err.cause holds
+      // the real reason (ENOTFOUND, ECONNREFUSED, certificate errors, ...).
+      const c = e.cause || {};
+      bad(`${table.padEnd(10)} ${e.message}${c.code ? ` (${c.code})` : ''}${c.message ? ` — ${c.message}` : ''}`);
     }
   }
  
-  head('3. Local API server (must be running: npm --prefix server run dev)');
+  head('4. Local API server (must be running: npm --prefix server run dev)');
   const port = process.env.PORT || 5500;
   try {
-    const res = await fetch(`http://localhost:${port}/api/health`);
-    ok(`http://localhost:${port}/api/health → HTTP ${res.status} ${await res.text()}`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/health`);
+    ok(`http://127.0.0.1:${port}/api/health → HTTP ${res.status} ${await res.text()}`);
   } catch (e) {
-    bad(`http://localhost:${port}/api/health unreachable — ${e.message}`);
-    console.log('        The browser gets empty data when this is down, because the');
-    console.log('        Vite proxy has nothing to forward /api to. Login still works,');
-    console.log('        since that talks to Supabase directly.');
+    const c = e.cause || {};
+    bad(`http://127.0.0.1:${port}/api/health — ${e.message}${c.code ? ` (${c.code})` : ''}`);
+    console.log('        ECONNREFUSED here means the API is not running. Start it with');
+    console.log('        `npm --prefix server run dev` and read its FIRST lines — if it');
+    console.log('        crashed, the reason is printed there.');
+    console.log('        While it is down the Vite proxy has nothing to forward /api to,');
+    console.log('        so the panel shows zeroes. Login keeps working because it talks');
+    console.log('        to Supabase directly.');
   }
  
-  head('4. An authenticated endpoint through the API');
+  head('5. An authenticated endpoint through the API');
   try {
-    const res = await fetch(`http://localhost:${port}/api/admin/products`);
+    const res = await fetch(`http://127.0.0.1:${port}/api/admin/products`);
     if (res.status === 401) ok('/api/admin/products → 401 without a token (correct)');
     else warn(`/api/admin/products → HTTP ${res.status} (expected 401)`);
   } catch {
-    bad('could not reach the API — see step 3');
+    bad('could not reach the API — see step 4');
   }
  
-  head('5. AI provider');
+  head('6. AI provider');
   const provider = process.env.AI_PROVIDER || 'claude';
   const aiKey = provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.CLAUDE_API_KEY;
   if (!aiKey) bad(`AI_PROVIDER=${provider} but ${provider === 'openai' ? 'OPENAI_API_KEY' : 'CLAUDE_API_KEY'} is empty — War Room will fail`);

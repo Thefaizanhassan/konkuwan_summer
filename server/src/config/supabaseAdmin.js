@@ -1,4 +1,8 @@
 // Single service-role client for all controllers (bypasses RLS; server is trusted).
+// Load configuration first: config/index.js calls dotenv.config(), and this
+// module reads process.env at load time. Requiring it here makes the module
+// self-sufficient no matter which entry point pulls it in first.
+require('./index');
 const { createClient } = require('@supabase/supabase-js');
 
 const url = process.env.SUPABASE_URL;

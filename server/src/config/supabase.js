@@ -2,6 +2,10 @@
 // resolve the SAME key as config/supabaseAdmin.js. These two used opposite
 // precedence, so if SUPABASE_SERVICE_KEY and SUPABASE_SERVICE_ROLE_KEY held
 // different values, half the app ran as one Postgres role and half as another.
+// Load configuration first: config/index.js calls dotenv.config(), and this
+// module reads process.env at load time. Requiring it here makes the module
+// self-sufficient no matter which entry point pulls it in first.
+require('./index');
 const { createClient } = require('@supabase/supabase-js');
 
 if (!process.env.SUPABASE_URL) {

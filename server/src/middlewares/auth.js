@@ -1,4 +1,8 @@
 const AppError = require('../utils/AppError');
+// Load configuration first: config/index.js calls dotenv.config(), and this
+// module reads process.env at load time. Requiring it here makes the module
+// self-sufficient no matter which entry point pulls it in first.
+require('../config');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
