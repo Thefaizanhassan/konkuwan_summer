@@ -2,7 +2,31 @@
 
 A modern, scalable B2B platform for medicinal herb supply, built with React, Node.js, Express, and PostgreSQL.  
 This repository contains the public-facing website and a full-featured admin dashboard.
-
+A B2B platform for medicinal herb supply: a public-facing website plus a full admin
+dashboard, built with React and Express on Supabase, deployed as a single Cloudflare Worker.
+ 
+---
+ 
+## 📚 Documentation
+ 
+These are the maintained source of truth and are kept in step with the code.
+Start here.
+ 
+| Document | Read it for |
+|---|---|
+| **[PRD.md](./PRD.md)** | What is being built and why — modules, business rules, roadmap |
+| **[Architecture.md](./Architecture.md)** | How it is built — stack, folders, flows, API, database, deployment |
+| **[RULES.md](./RULES.md)** | Engineering standards for contributors, human or AI |
+| **[Phases.md](./Phases.md)** | Development phases and what is done, in progress or planned |
+| **[Design.md](./Design.md)** | Design system — colours, typography, components, responsive rules |
+| **[Memory.md](./Memory.md)** | Living log — current status, timeline, decisions, known bugs |
+ 
+> **Note on the sections below.** The rest of this README dates from the original
+> build and its Architecture, Database and Deployment sections are **superseded**:
+> the project no longer uses Sequelize or a direct PostgreSQL connection — all data
+> access goes through Supabase over HTTPS — and it deploys to Cloudflare Workers
+> rather than a Node host. The setup and developer-guide steps remain broadly
+> accurate. Prefer [Architecture.md](./Architecture.md) where the two disagree.
 ---
 
 ## Table of Contents
