@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -27,6 +28,123 @@ function StatusBadge({ status }) {
     >
       {status}
     </span>
+  );
+}
+
+// Severity palette. High is a genuine warning red, medium the dashboard's
+// existing amber, low a calm sage so a single overdue visit does not read as
+// an emergency.
+const SEVERITY = {
+  high: { bg: '#FDF2F1', border: '#F0C9C5', accent: '#B3261E', chipBg: '#F7DBD8', text: '#7A1C16' },
+  medium: { bg: '#FFF8EC', border: '#F3D9A4', accent: '#B45309', chipBg: '#FBEBD0', text: '#7C4A03' },
+  low: { bg: '#F2F7F2', border: '#CFE0D2', accent: '#2B5240', chipBg: '#DFEBE1', text: '#24422F' },
+};
+ 
+// The "⚠ Needs attention" panel: one card per outstanding item, ordered by
+// severity so the most urgent thing is always first.
+export function NeedsAttention({ overview, t }) {
+  const inquiries = overview.inquiries_new ?? 0;
+  const drafts = overview.draft_orders ?? 0;
+  const visits = overview.farmers_needing_visit ?? 0;
+ 
+  const items = [
+    inquiries > 0 && {
+      key: 'inquiries',
+      icon: '✉',
+      count: inquiries,
+      title: t('dashboard.attentionInquiriesTitle'),
+      desc: t('dashboard.attentionInquiriesDesc'),
+      // Unanswered enquiries are lost revenue, and they age badly.
+      severity: inquiries >= 3 ? 'high' : 'medium',
+      to: '/admin/inquiries',
+    },
+    drafts > 0 && {
+      key: 'drafts',
+      icon: '📄',
+      count: drafts,
+      title: t('dashboard.attentionDraftsTitle'),
+      desc: t('dashboard.attentionDraftsDesc'),
+      severity: drafts >= 5 ? 'high' : 'medium',
+      to: '/admin/orders',
+    },
+    visits > 0 && {
+      key: 'visits',
+      icon: '🌱',
+      count: visits,
+      title: t('dashboard.attentionVisitsTitle'),
+      desc: t('dashboard.attentionVisitsDesc'),
+      severity: visits >= 5 ? 'medium' : 'low',
+      to: '/admin/farm',
+    },
+  ].filter(Boolean);
+ 
+  if (items.length === 0) return null;
+ 
+  const rank = { high: 0, medium: 1, low: 2 };
+  items.sort((a, b) => rank[a.severity] - rank[b.severity]);
+  const worst = items[0].severity;
+  const priorityLabel = { high: t('dashboard.priorityHigh'), medium: t('dashboard.priorityMedium'), low: t('dashboard.priorityLow') };
+ 
+  return (
+    <section
+      className="rounded-2xl p-5 sm:p-6 mb-8"
+      style={{ background: '#fff', border: `1px solid ${SEVERITY[worst].border}`, boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}
+      aria-label={t('dashboard.needsAttention')}
+    >
+      <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
+        <h3 className="font-display text-lg flex items-center gap-2" style={{ color: '#1c2e1f' }}>
+          <span aria-hidden="true" style={{ color: SEVERITY[worst].accent }}>⚠</span>
+          {t('dashboard.needsAttention')}
+        </h3>
+        <span className="text-xs" style={{ color: '#7b8a76' }}>
+          {t('dashboard.attentionSubtitle', { count: items.length })}
+        </span>
+      </div>
+ 
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {items.map((item) => {
+          const c = SEVERITY[item.severity];
+          return (
+            <Link
+              key={item.key}
+              to={item.to}
+              className="group flex flex-col rounded-xl p-4 transition hover:shadow-md focus:outline-none focus:ring-2"
+              style={{ background: c.bg, border: `1px solid ${c.border}` }}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-base"
+                  style={{ background: c.chipBg }}
+                  aria-hidden="true"
+                >
+                  {item.icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-2xl font-bold leading-none" style={{ color: c.accent }}>{item.count}</span>
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                      style={{ background: c.chipBg, color: c.text }}
+                    >
+                      {priorityLabel[item.severity]}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold mt-1" style={{ color: c.text }}>{item.title}</p>
+                  <p className="text-xs mt-0.5 leading-snug" style={{ color: '#6a7a63' }}>{item.desc}</p>
+                </div>
+              </div>
+              <span
+                className="mt-3 self-start text-xs font-semibold inline-flex items-center gap-1"
+                style={{ color: c.accent }}
+              >
+                {t('dashboard.reviewCta')}
+                <span className="transition-transform group-hover:translate-x-0.5" aria-hidden="true">→</span>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -65,8 +183,16 @@ function KPICard({ label, value, trend, trendUp }) {
 
 const fmtTrend = (t) => (t == null ? null : `${t > 0 ? '+' : ''}${t}%`);
 
+// One formatter for both chart views so the axis and tooltip never disagree.
+const fmtMoney = (v) => {
+  const n = Number(v) || 0;
+  return n >= 1000 ? `₹${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : `₹${n}`;
+};
+
 export default function Dashboard() {
   const { t } = useTranslation();
+  // null = 12-month overview; 'YYYY-MM' = drilled into that month.
+  const [drillMonth, setDrillMonth] = useState(null);
   const { user } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
@@ -91,10 +217,34 @@ export default function Dashboard() {
   const recentActivity = data?.data?.recent_activity || [];
   const recentOrders = data?.data?.recent_orders || [];
   const topProducts = data?.data?.top_products || [];
+  // Monthly series. `key` is the YYYY-MM used to drill down; `label` is what
+  // the axis shows. Revenue stays in rupees and is formatted at render time,
+  // so the monthly and daily views share one scale and one tooltip format.
   const revenueChart = (data?.data?.revenue_chart || []).map(d => ({
-    month: new Date(d.month).toLocaleString('default', { month: 'short' }),
-    revenue: Math.round(Number(d.revenue) / 1000),
+    key: String(d.month).slice(0, 7),
+    label: new Date(d.month).toLocaleString('default', { month: 'short' }),
+    revenue: Number(d.revenue) || 0,
   }));
+  const revenueDaily = data?.data?.revenue_daily || [];
+ 
+  // Every day of the drilled-in month, including days with no sales, so a
+  // quiet month still renders a full axis instead of a single floating point.
+  const dailyChart = (() => {
+    if (!drillMonth) return [];
+    const [y, m] = drillMonth.split('-').map(Number);
+    const byDate = Object.fromEntries(revenueDaily.map(d => [d.date, Number(d.revenue) || 0]));
+    return Array.from({ length: new Date(y, m, 0).getDate() }, (_, i) => {
+      const date = `${drillMonth}-${String(i + 1).padStart(2, '0')}`;
+      return { key: date, label: String(i + 1), revenue: byDate[date] || 0 };
+    });
+  })();
+ 
+  const isDrilled = Boolean(drillMonth);
+  const chartData = isDrilled ? dailyChart : revenueChart;
+  const drillMonthLabel = drillMonth
+    ? new Date(`${drillMonth}-01`).toLocaleString('default', { month: 'long', year: 'numeric' })
+    : '';
+  const monthHasSales = dailyChart.some(d => d.revenue > 0);
 
   const name = user?.profile?.name || user?.email?.split('@')[0] || 'Admin';
   const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -173,52 +323,64 @@ export default function Dashboard() {
       </div>
  
       {/* Needs attention */}
-      {((overview.inquiries_new ?? 0) > 0 || (overview.draft_orders ?? 0) > 0 || (overview.farmers_needing_visit ?? 0) > 0) && (
-        <div className="rounded-2xl p-5 mb-8" style={{ background: '#FFF8EC', border: '1px solid #f3d9a4' }}>
-          <h3 className="font-display text-lg mb-2" style={{ color: '#7c4a03' }}>⚠ {t('dashboard.needsAttention')}</h3>
-          <ul className="text-sm space-y-1" style={{ color: '#7c4a03' }}>
-            {(overview.inquiries_new ?? 0) > 0 && (
-              <li><Link to="/admin/inquiries" className="underline">{t('dashboard.attentionInquiries', { count: overview.inquiries_new })}</Link></li>
-            )}
-            {(overview.draft_orders ?? 0) > 0 && (
-              <li><Link to="/admin/orders" className="underline">{t('dashboard.attentionDrafts', { count: overview.draft_orders })}</Link></li>
-            )}
-            {(overview.farmers_needing_visit ?? 0) > 0 && (
-              <li><Link to="/admin/farm" className="underline">{t('dashboard.attentionVisits', { count: overview.farmers_needing_visit })}</Link></li>
-            )}
-          </ul>
-        </div>
-      )}
+      <NeedsAttention overview={overview} t={t} />
 
       {/* Chart + Top Products */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-7 mb-8">
         {/* Chart */}
         <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>{t('dashboard.revenue12')}</h3>
-            <div className="flex items-center gap-2 text-xs" style={{ color: '#5f7059' }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <h3 className="font-display text-xl truncate" style={{ color: '#1c2e1f' }}>
+                {isDrilled ? drillMonthLabel : t('dashboard.revenue12')}
+              </h3>
+              {isDrilled && (
+                <button
+                  type="button"
+                  onClick={() => setDrillMonth(null)}
+                  className="text-xs font-semibold px-2.5 py-1 rounded-full transition hover:opacity-80 flex-shrink-0"
+                  style={{ background: 'rgba(22,47,34,0.06)', color: '#2a5e3a' }}
+                >
+                  ← {t('dashboard.backToMonths')}
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-xs flex-shrink-0" style={{ color: '#5f7059' }}>
               <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#2a5e3a' }} />
-              {t('dashboard.monthlyRevenue')}
+              {isDrilled ? t('dashboard.dailyRevenue') : t('dashboard.monthlyRevenue')}
             </div>
           </div>
           <div style={{ height: 220 }}>
-            {revenueChart.length > 0 ? (
+            {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueChart} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 4, right: 4, bottom: 0, left: -10 }}
+                  // Clicking a month swaps in that month's daily series. The
+                  // data is already loaded, so this makes no extra request.
+                  onClick={(e) => {
+                    if (isDrilled) return;
+                    const key = e?.activePayload?.[0]?.payload?.key;
+                    if (key) setDrillMonth(key);
+                  }}
+                  style={{ cursor: isDrilled ? 'default' : 'pointer' }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v}K`} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false}
+                    interval={isDrilled ? 2 : 0} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} tickFormatter={fmtMoney} />
                   <Tooltip
                     contentStyle={{ background: '#1c2e1f', border: 'none', borderRadius: 8, color: '#f4efe6', fontSize: 12 }}
-                    formatter={v => [`₹${v}K`, 'Revenue']}
+                    labelFormatter={(label) => (isDrilled ? `${label} ${drillMonthLabel}` : label)}
+                    formatter={(v) => [fmtMoney(v), t('dashboard.monthlyRevenue')]}
                   />
                   <Line
                     type="monotone"
                     dataKey="revenue"
                     stroke="#1f4a2a"
-                    strokeWidth={2.5}
-                    dot={{ fill: '#1f4a2a', strokeWidth: 2, stroke: '#fff', r: 4 }}
-                    activeDot={{ r: 6 }}
+                    strokeWidth={4}
+                    dot={isDrilled ? false : { fill: '#1f4a2a', strokeWidth: 2, stroke: '#fff', r: 5 }}
+                    activeDot={{ r: 7, strokeWidth: 2, stroke: '#fff' }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -226,6 +388,17 @@ export default function Dashboard() {
               <div className="flex items-center justify-center h-full text-sm text-muted">{t('dashboard.noRevenue')}</div>
             )}
           </div>
+          {/* A month with no sales still draws a full flat axis, so say why. */}
+          {isDrilled && !monthHasSales && (
+            <p className="text-xs text-center mt-2" style={{ color: '#9aa694' }}>
+              {t('dashboard.noRevenueMonth', { month: drillMonthLabel })}
+            </p>
+          )}
+          {!isDrilled && revenueChart.length > 0 && (
+            <p className="text-xs text-center mt-2" style={{ color: '#9aa694' }}>
+              {t('dashboard.clickMonthHint')}
+            </p>
+          )}
         </div>
 
         {/* Top Products */}

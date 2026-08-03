@@ -1,5 +1,6 @@
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
+const { BILLABLE_ORDER_STATUSES } = require('../utils/orderStatus');
 
 const monthStart = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const ymd = (d) => d.toISOString().slice(0, 10);
@@ -14,28 +15,41 @@ exports.getDashboardStats = async (req, res, next) => {
     const twelveAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
 
     // Pull the slices we need (small dataset; aggregate in JS)
-    const [{ data: deliveredYear }, { data: ordersThisMonth }, { data: ordersPrevMonth }, { count: totalCustomers }, { count: custBeforeThis }] =
+    const [{ data: billableYear }, { data: ordersThisMonth }, { data: ordersPrevMonth }, { count: totalCustomers }, { count: custBeforeThis }] =
       await Promise.all([
-        supabase.from('orders').select('total_amount, order_date, status').eq('status', 'delivered').gte('order_date', ymd(twelveAgo)),
+        // Revenue counts confirmed/dispatched/delivered — matching Finance.
+        // Filtering to 'delivered' alone reported 0 for every order that had
+        // been invoiced but not yet marked delivered.
+        supabase.from('orders').select('total_amount, order_date, status').in('status', BILLABLE_ORDER_STATUSES).gte('order_date', ymd(twelveAgo)),
         supabase.from('orders').select('id, status').neq('status', 'cancelled').gte('order_date', ymd(somThis)),
         supabase.from('orders').select('id, total_amount, status').gte('order_date', ymd(somPrev)).lte('order_date', ymd(eomPrev)),
         supabase.from('customers').select('id', { count: 'exact', head: true }),
         supabase.from('customers').select('id', { count: 'exact', head: true }).lt('created_at', somThis.toISOString()),
       ]);
 
-    const revMTD = (deliveredYear || []).filter((o) => o.order_date >= ymd(somThis)).reduce((s, o) => s + Number(o.total_amount || 0), 0);
+    const revMTD = (billableYear || []).filter((o) => o.order_date >= ymd(somThis)).reduce((s, o) => s + Number(o.total_amount || 0), 0);
     const ordersMTD = (ordersThisMonth || []).length;
 
-    const revPrev = (ordersPrevMonth || []).filter((o) => o.status === 'delivered').reduce((s, o) => s + Number(o.total_amount || 0), 0);
+    const revPrev = (ordersPrevMonth || []).filter((o) => BILLABLE_ORDER_STATUSES.includes(o.status)).reduce((s, o) => s + Number(o.total_amount || 0), 0);
     const ordersPrev = (ordersPrevMonth || []).filter((o) => o.status !== 'cancelled').length;
 
-    // Revenue chart: monthly buckets over last 12 months
+    // Revenue chart: monthly buckets over last 12 months, plus the same
+    // orders bucketed by day. Both come from the one `billableYear` result,
+    // so the month -> day drill-down costs no extra request; the client just
+    // filters the daily array it already has.
     const buckets = {};
-    (deliveredYear || []).forEach((o) => {
-      const key = o.order_date.slice(0, 7); // YYYY-MM
-      buckets[key] = (buckets[key] || 0) + Number(o.total_amount || 0);
+    const dayBuckets = {};
+    (billableYear || []).forEach((o) => {
+      const month = o.order_date.slice(0, 7); // YYYY-MM
+      const day = o.order_date.slice(0, 10); // YYYY-MM-DD
+      const amount = Number(o.total_amount || 0);
+      buckets[month] = (buckets[month] || 0) + amount;
+      dayBuckets[day] = (dayBuckets[day] || 0) + amount;
     });
     const revenue_chart = Object.entries(buckets).sort().map(([month, revenue]) => ({ month: `${month}-01`, revenue }));
+    // Only days that actually have revenue; the client fills the rest of the
+    // month with zeroes so a quiet month still renders a full axis.
+    const revenue_daily = Object.entries(dayBuckets).sort().map(([date, revenue]) => ({ date, revenue }));
 
     // Recent 5 orders
     const { data: recent } = await supabase
@@ -49,7 +63,7 @@ exports.getDashboardStats = async (req, res, next) => {
     const { data: items } = await supabase
       .from('order_items')
       .select('quantity, product:products(name, unit), order:orders!inner(status, order_date)')
-      .eq('order.status', 'delivered')
+      .in('order.status', BILLABLE_ORDER_STATUSES)
       .gte('order.order_date', ymd(somThis));
     const prodMap = {};
     (items || []).forEach((it) => {
@@ -131,6 +145,7 @@ exports.getDashboardStats = async (req, res, next) => {
         recent_orders,
         top_products,
         revenue_chart,
+        revenue_daily,
       },
     });
   } catch (err) { next(err); }
@@ -139,8 +154,11 @@ exports.getDashboardStats = async (req, res, next) => {
 // Revenue report (period series + summary)
 exports.getRevenueReport = async (req, res, next) => {
   try {
-    const { from, to, status = 'delivered', period = 'month' } = req.query;
-    let q = supabase.from('orders').select('total_amount, order_date').eq('status', status);
+    const { from, to, status, period = 'month' } = req.query;
+    // Default to every billable status so this report agrees with the
+    // dashboard and Finance; an explicit ?status= still narrows it.
+    let q = supabase.from('orders').select('total_amount, order_date');
+    q = status ? q.eq('status', status) : q.in('status', BILLABLE_ORDER_STATUSES);
     if (from) q = q.gte('order_date', from);
     if (to) q = q.lte('order_date', to);
     const { data, error } = await q;
@@ -183,7 +201,7 @@ exports.getSalesReport = async (req, res, next) => {
     if (error) return next(new AppError(error.message, 500));
 
     const nonCancelled = (data || []).filter((o) => o.status !== 'cancelled');
-    const totalRevenue = (data || []).filter((o) => o.status === 'delivered').reduce((s, o) => s + Number(o.total_amount || 0), 0);
+    const totalRevenue = (data || []).filter((o) => BILLABLE_ORDER_STATUSES.includes(o.status)).reduce((s, o) => s + Number(o.total_amount || 0), 0);
     const dist = {};
     (data || []).forEach((o) => { dist[o.status] = (dist[o.status] || 0) + 1; });
 

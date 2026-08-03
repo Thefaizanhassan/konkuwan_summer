@@ -35,7 +35,10 @@
  
   "vars": {
     "NODE_ENV": "production",
-    "AI_PROVIDER": "claude"
+    // Must match whichever API key is set as a secret. CLAUDE_API_KEY is
+    // currently empty, so Farm Ops would report "not configured" if this
+    // said "claude". Flip back once an Anthropic key is in place.
+    "AI_PROVIDER": "openai"
   },
  
   "observability": { "enabled": true }

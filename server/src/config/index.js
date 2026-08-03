@@ -18,14 +18,28 @@ const config = {
   },
 };
 
-// Validate required env variables in production
+// Validate required env variables in production.
+//
+// On Cloudflare this runs while the Worker is being validated at deploy time,
+// so a missing value fails the deploy rather than shipping a broken Worker.
+// Report every missing name at once and say where to set them — a bare
+// "Missing SUPABASE_URL" sends people to the wrong screen. These are runtime
+// SECRETS on the Worker; Workers Builds "Build variables" are a different
+// setting that only exists while `vite build` runs and never reaches
+// process.env at request time (that is where the VITE_* values belong).
 if (config.env === 'production') {
   const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
-  required.forEach((key) => {
-    if (!process.env[key]) {
-      throw new Error(`Missing required environment variable: ${key}`);
-    }
-  });
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length) {
+    throw new Error(
+      `Missing required environment variable${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}. ` +
+        'On Cloudflare set these as Worker secrets — Workers & Pages > your Worker > ' +
+        'Settings > Variables and Secrets > Add > type "Secret" — or run ' +
+        `${missing.map((k) => `\`npx wrangler secret put ${k}\``).join(' and ')}. ` +
+        'Note that Workers Builds "Build variables" are a separate setting and are ' +
+        'NOT visible to the Worker at runtime.'
+    );
+  }
 }
 
 module.exports = config;

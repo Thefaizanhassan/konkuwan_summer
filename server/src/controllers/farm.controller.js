@@ -3,6 +3,7 @@ const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
 const { createFarmerSchema } = require('../validations/farmer.validation');
+const { BILLABLE_ORDER_STATUSES } = require('../utils/orderStatus');
 
 // const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 // ── AI provider (switchable: Claude / OpenAI) ────────────────────────────
@@ -378,7 +379,7 @@ exports.getFinanceSummary = async (req, res, next) => {
       supabase.from('expenses').select('type, amount').gte('date', start).lt('date', end),
       supabase.from('orders').select('total_amount, status')
         .gte('order_date', start).lt('order_date', end)
-        .in('status', ['confirmed', 'dispatched', 'delivered']),
+        .in('status', BILLABLE_ORDER_STATUSES),
     ]);
     if (e1 || e2) return next(new AppError((e1 || e2).message, 500));
  
@@ -410,7 +411,7 @@ exports.generateBrief = async (req, res, next) => {
       supabase.from('expenses').select('*'),
       supabase.from('farmers').select('*, farmer_visits(*)'),
       supabase.from('cash_balance').select('*').order('updated_at', { ascending: false }).limit(1),
-      supabase.from('orders').select('total_amount').in('status', ['confirmed', 'dispatched', 'delivered']),
+      supabase.from('orders').select('total_amount').in('status', BILLABLE_ORDER_STATUSES),
     ]);
 
     const cashAmount = cash?.[0]?.amount || 0;

@@ -59,6 +59,20 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // ── Compression ──
 // Cloudflare compresses at the edge; doing it again here only burns CPU.
 
+// New product images go to Supabase Storage and are stored as absolute URLs.
+// Rows created before that change hold relative paths like
+// /uploads/products/x.jpg, and those files may still exist on a developer's
+// disk — so keep serving them locally rather than breaking old images.
+// Skipped entirely on Workers, which has no such directory.
+if (typeof __dirname !== 'undefined') {
+  const fs = require('fs');
+  const path = require('path');
+  const uploadsDir = path.join(__dirname, '..', 'uploads');
+  if (fs.existsSync(uploadsDir)) {
+    app.use('/uploads', express.static(uploadsDir));
+  }
+}
+
 // ── Health check ──
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
