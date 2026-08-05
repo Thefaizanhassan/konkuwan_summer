@@ -371,20 +371,29 @@ export async function downloadChallan(challanId) {
   const pageW = doc.internal.pageSize.getWidth();
   const logo = await logoAsPng();
  
+  const isTransfer = c.challan_type === 'warehouse_transfer';
+ 
   drawHeader(doc, pageW, {
-    title: d('doc.challanTitle'),
+    title: isTransfer ? d('doc.transferTitle') : d('doc.challanTitle'),
     numberLabel: d('doc.challanNo'), numberValue: c.challan_number,
     dateLabel: d('doc.challanDate'), dateValue: new Date(c.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
   }, logo);
- 
+
+  // Left panel is where the goods came from, right is where they went.
+  // A procurement starts at a farmer, a transfer at a warehouse; both end at
+  // the destination warehouse. Challans raised before warehouses existed have
+  // no destination, so they fall back to the company as before.
+  const from = c.from || {
+    name: c.farmer?.name || '—',
+    address: c.farmer?.address || c.farmer?.village || '',
+    phone: c.farmer?.phone || '',
+  };
+  const to = c.to || c.company;
+
   const partiesBottom = drawParties(
     doc, pageW,
-    d('doc.receivedBy'), c.company,
-    d('doc.suppliedBy'), {
-      name: c.farmer.name,
-      address: c.farmer.village,
-      phone: c.farmer.phone,
-    },
+    isTransfer ? d('doc.dispatchedFrom') : d('doc.suppliedBy'), from,
+    d('doc.dispatchedTo'), to,
     135
   );
  
@@ -427,7 +436,7 @@ export async function downloadChallan(challanId) {
  
   y = ty + 44;
   doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(90);
-  doc.text(d('doc.chargesNote'), 40, y, { maxWidth: pageW - 80 });
+  doc.text(isTransfer ? d('doc.transferNote') : d('doc.chargesNote'), 40, y, { maxWidth: pageW - 80 });
  
   if (c.notes) {
     y += 22;
@@ -443,8 +452,8 @@ export async function downloadChallan(challanId) {
   doc.setDrawColor(150);
   doc.line(40, y, 200, y);
   doc.line(pageW - 200, y, pageW - 40, y);
-  doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(90);
-  doc.text(d('doc.farmerSignature'), 40, y + 14);
+  doc.text(isTransfer ? d('doc.dispatchingSignature') : d('doc.farmerSignature'), 40, y + 14);
+  doc.text(isTransfer ? d('doc.receivingSignature') : d('doc.authorisedSignatory'), pageW - 200, y + 14);
   doc.text(d('doc.authorisedSignatory'), pageW - 200, y + 14);
  
   // Challan-specific footer (it IS signed, so no "no signature required" note)

@@ -1,7 +1,7 @@
 # Master task tracker — Major Feature Update
  
-**Created:** 2026-08-02 · **Status:** 🚧 In progress — Task 0 ✅, Task 1 next
- 
+**Created:** 2026-08-02 · **Status:** 🚧 In progress — Tasks 0–1 ✅, Task 2 next
+
 Legend: ⏳ Pending · 🚧 In Progress · ✅ Completed · ⚠️ Blocked
  
 Related: [Memory.md](./Memory.md) · [PRD.md](./PRD.md) · [Architecture.md](./Architecture.md) · [RULES.md](./RULES.md)
@@ -112,26 +112,47 @@ managing the list is super-admin only.
  
 ---
  
-## Task 1 — Redesign Delivery Challan ⏳ Pending (after Task 0)
+## Task 1 — Redesign Delivery Challan ✅ Completed
  
 **Objective.** Two challan types: farmer → warehouse procurement, and
 warehouse → warehouse transfer.
  
 | # | Subtask | Status |
 |---|---|---|
-| 1.1 | Migration: `challan_type`, `source_warehouse_id`, `destination_warehouse_id`, `farmer_address` | ⏳ |
-| 1.2 | Migration: `farmers.address` + fallback to village/block | ⏳ |
-| 1.3 | Joi: conditional validation per challan type | ⏳ |
-| 1.4 | Controller: branch on type; keep existing payloads working | ⏳ |
-| 1.5 | UI: type selector driving which fields show | ⏳ |
-| 1.6 | UI: farmer select with "Other", auto-filled address | ⏳ |
-| 1.7 | UI: warehouse selects for both types | ⏳ |
-| 1.8 | Rename "Received By" → "Dispatched To" in UI **and** PDF | ⏳ |
-| 1.9 | PDF: render both challan types correctly | ⏳ |
-| 1.10 | Verify existing challans still open, print and list | ⏳ |
+| 1.1 | Migration: `challan_type`, `source_warehouse_id`, `destination_warehouse_id`, `farmer_address` | ✅ |
+| 1.2 | Migration: `farmers.address` + fallback to village/block | ✅ |
+| 1.3 | Joi: conditional validation per challan type | ✅ |
+| 1.4 | Controller: branch on type; keep existing payloads working | ✅ |
+| 1.5 | UI: type selector driving which fields show | ✅ |
+| 1.6 | UI: farmer select with "Other", auto-filled address | ✅ |
+| 1.7 | UI: warehouse selects for both types | ✅ |
+| 1.8 | Rename "Received By" → "Dispatched To" in UI **and** PDF | ✅ |
+| 1.9 | PDF: render both challan types correctly | ✅ |
+| 1.10 | Verify existing challans still open, print and list | ✅ |
  
-**Backward compatibility.** Existing rows have no `challan_type`. The migration
-defaults them to `farmer_to_warehouse` so history keeps working.
+**Delivered.** Two challan types sharing one table. Procurement takes a farmer
+(enrolled or "Other") plus a destination warehouse; a transfer takes both
+warehouses and refuses to let them match. The farmer's address is snapshotted
+onto the challan at creation, so the document survives later edits to the
+farmer record. "Other" writes name and address to the challan only — no farmer
+row is created. "Received By" is now "Dispatched To" in the UI and the PDF, and
+the PDF's left panel is the source (farmer or warehouse) with type-appropriate
+signature lines and footer note.
+ 
+**Files:** `challan.validation.js`, `challan.controller.js`,
+`DeliveryChallan.jsx`, `lib/invoice.js`, locales (+47 keys × 2).
+ 
+**Bug found and fixed during testing.** `Joi.valid('warehouse_transfer')` also
+matches `undefined`, so a payload without `challan_type` — which is exactly
+what the previous client sends — was pushed down the transfer branch and
+rejected. Adding `.required()` to the condition fixed it. Caught only because
+the test asserted the legacy payload explicitly.
+ 
+**Backward compatibility verified.** Legacy payloads validate and default to
+procurement; legacy rows print, with `to` null so the PDF falls back to the
+company panel as before.
+ 
+**No new dependencies.**
  
 ---
  
@@ -257,3 +278,4 @@ per-farmer personal details.
 |---|---|---|---|
 | 2026-08-02 | — | Tracker created; codebase surveyed; warehouse blocker identified | `TASKS.md` |
 | 2026-08-02 | 0 | Warehouse entity: migration, API, admin screen, i18n | migration, `warehouse.*`, `WarehouseManagement.jsx`, `app.js`, `App.jsx`, `Sidebar.jsx`, locales |
+| 2026-08-02 | 1 | Two challan types, Other farmer, warehouse routing, Dispatched To | `challan.validation.js`, `challan.controller.js`, `DeliveryChallan.jsx`, `lib/invoice.js`, locales |

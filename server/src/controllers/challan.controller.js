@@ -4,7 +4,24 @@ const auditLog = require('../utils/audit');
 const { createChallanSchema } = require('../validations/challan.validation');
  
 const CHALLAN_SELECT =
-  '*, farmer:farmers(id,name,village,phone), items:challan_items(*, product:products(id,name,unit)), creator:profiles(name)';
+  '*, farmer:farmers(id,name,village,block,address,phone), ' +
+  'source_warehouse:warehouses!delivery_challans_source_warehouse_id_fkey(id,name,address,city,state), ' +
+  'destination_warehouse:warehouses!delivery_challans_destination_warehouse_id_fkey(id,name,address,city,state), ' +
+  'items:challan_items(*, product:products(id,name,unit)), creator:profiles(name)';
+ 
+// Farmers enrolled before `address` existed have only village and block, so
+// fall back to those rather than showing an empty address on the challan.
+function farmerAddress(farmer, explicit) {
+  if (explicit) return explicit;
+  if (!farmer) return null;
+  return farmer.address || [farmer.village, farmer.block].filter(Boolean).join(', ') || null;
+}
+ 
+// A warehouse's printable address: its own address line, else city/state.
+function warehouseAddress(w) {
+  if (!w) return null;
+  return w.address || [w.city, w.state].filter(Boolean).join(', ') || null;
+}
 
 function financialYear(dateStr) {
   const d = new Date(dateStr);
@@ -18,10 +35,15 @@ exports.getAllChallans = async (req, res, next) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const from = (page - 1) * limit;
-    const { farmer_id, from_date, to_date, search } = req.query;
+    const { farmer_id, from_date, to_date, search, challan_type, warehouse_id } = req.query;
  
     let q = supabase.from('delivery_challans').select(CHALLAN_SELECT, { count: 'exact' });
     if (farmer_id) q = q.eq('farmer_id', farmer_id);
+    if (challan_type) q = q.eq('challan_type', challan_type);
+    // Either end of a movement counts as "this warehouse was involved".
+    if (warehouse_id) {
+      q = q.or(`source_warehouse_id.eq.${warehouse_id},destination_warehouse_id.eq.${warehouse_id}`);
+    }
     if (from_date) q = q.gte('challan_date', from_date);
     if (to_date) q = q.lte('challan_date', to_date);
     if (search) q = q.or(`challan_number.ilike.%${search}%,farmer_name.ilike.%${search}%`);
@@ -48,11 +70,26 @@ exports.createChallan = async (req, res, next) => {
  
     const challanDate = value.challan_date || new Date().toISOString().slice(0, 10);
  
-    // Snapshot the farmer name (survives if the farmer record is later removed)
-    let farmerName = value.farmer_name || null;
-    if (value.farmer_id && !farmerName) {
-      const { data: f } = await supabase.from('farmers').select('name').eq('id', value.farmer_id).single();
-      farmerName = f?.name || null;
+    const isTransfer = value.challan_type === 'warehouse_transfer';
+ 
+    // Snapshot the farmer's name and address onto the challan. Both survive if
+    // the farmer record is later edited or removed, which matters because a
+    // challan is a document of record. For an "Other" farmer this is the only
+    // place the details are stored — no farmer row is created.
+    let farmerName = null;
+    let farmerAddr = null;
+    if (!isTransfer) {
+      farmerName = value.farmer_name || null;
+      farmerAddr = value.farmer_address || null;
+      if (value.farmer_id) {
+        const { data: f } = await supabase
+          .from('farmers')
+          .select('name, village, block, address')
+          .eq('id', value.farmer_id)
+          .single();
+        if (!farmerName) farmerName = f?.name || null;
+        if (!farmerAddr) farmerAddr = farmerAddress(f, null);
+      }
     }
  
     // Unique challan number: CH/<FY>/<seq>
@@ -67,8 +104,13 @@ exports.createChallan = async (req, res, next) => {
       .insert({
         challan_number: challanNumber,
         challan_date: challanDate,
-        farmer_id: value.farmer_id || null,
+        challan_type: value.challan_type,
+        // A transfer has no farmer; a procurement has no source warehouse.
+        farmer_id: isTransfer ? null : value.farmer_id || null,
         farmer_name: farmerName,
+        farmer_address: farmerAddr,
+        source_warehouse_id: isTransfer ? value.source_warehouse_id : null,
+        destination_warehouse_id: value.destination_warehouse_id || null,
         challan_charges: charges,
         goods_value: +goodsValue.toFixed(2),
         total_value: +(goodsValue + charges).toFixed(2),
@@ -117,6 +159,7 @@ exports.printChallan = async (req, res, next) => {
       data: {
         doc_type: 'challan',
         title: 'Delivery Challan',
+        challan_type: challan.challan_type || 'farmer_to_warehouse',
         challan_number: challan.challan_number,
         date: challan.challan_date,
         company: {
@@ -130,8 +173,33 @@ exports.printChallan = async (req, res, next) => {
         farmer: {
           name: challan.farmer?.name || challan.farmer_name || '—',
           village: challan.farmer?.village || '',
+          address: farmerAddress(challan.farmer, challan.farmer_address),
           phone: challan.farmer?.phone || '',
         },
+        // `from` and `to` are what the PDF renders, so it does not have to
+        // know which workflow produced the challan:
+        //   procurement  from = the farmer,          to = destination warehouse
+        //   transfer     from = source warehouse,    to = destination warehouse
+        from:
+          challan.challan_type === 'warehouse_transfer'
+            ? {
+                name: challan.source_warehouse?.name || '—',
+                address: warehouseAddress(challan.source_warehouse),
+                kind: 'warehouse',
+              }
+            : {
+                name: challan.farmer?.name || challan.farmer_name || '—',
+                address: farmerAddress(challan.farmer, challan.farmer_address),
+                phone: challan.farmer?.phone || '',
+                kind: 'farmer',
+              },
+        to: challan.destination_warehouse
+          ? {
+              name: challan.destination_warehouse.name,
+              address: warehouseAddress(challan.destination_warehouse),
+              kind: 'warehouse',
+            }
+          : null,
         items: (challan.items || []).map((it) => ({
           product: it.product?.name || it.product_name || '—',
           quantity: Number(it.quantity),
