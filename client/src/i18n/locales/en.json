@@ -67,7 +67,8 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "openMenu": "Open menu",
-    "adminTitle": "Konkuwan Admin"
+    "adminTitle": "Konkuwan Admin",
+    "warehouses": "Warehouses"
   },
   "auth": {
     "adminLogin": "Admin Login",
@@ -624,5 +625,26 @@
     "pan": "PAN",
     "email": "Email",
     "phone": "Phone"
+},
+  "warehouses": {
+    "title": "Warehouses",
+    "addWarehouse": "Add Warehouse",
+    "editWarehouse": "Edit Warehouse",
+    "name": "Warehouse Name",
+    "code": "Code",
+    "address": "Address",
+    "city": "City",
+    "state": "State",
+    "pincode": "PIN Code",
+    "contactPerson": "Contact Person",
+    "location": "Location",
+    "active": "Active",
+    "inactive": "Inactive",
+    "deactivate": "Deactivate",
+    "confirmDeactivate": "Deactivate \"{{name}}\"? It will stop appearing on new challans but its history is kept.",
+    "confirmDelete": "Permanently delete \"{{name}}\"? This is only possible while it has no challans.",
+    "none": "No warehouses yet. Add one to start recording stock movements.",
+    "saveFailed": "Could not save the warehouse.",
+    "inactiveHint": "Inactive warehouses are hidden from new challans."
   }
 }

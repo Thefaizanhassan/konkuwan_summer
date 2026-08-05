@@ -26,6 +26,7 @@ import OrderManagement from './pages/admin/OrderManagement';
 import CustomerManagement from './pages/admin/CustomerManagement';
 import CustomerProfile from './pages/admin/CustomerProfile';
 import DeliveryChallan from './pages/admin/DeliveryChallan';
+import WarehouseManagement from './pages/admin/WarehouseManagement';
 import Finance from './pages/admin/Finance';
 import Account from './pages/admin/Account';
 import ContactInbox from './pages/admin/ContactInbox';
@@ -66,6 +67,7 @@ export default function App() {
                 <Route path="customers" element={<CustomerManagement />} />
                 <Route path="customers/:id" element={<CustomerProfile />} />
                 <Route path="challans" element={<DeliveryChallan />} />
+                <Route path="warehouses" element={<WarehouseManagement />} />
                 <Route path="finance" element={<Finance />} />
                 <Route path="inquiries" element={<ContactInbox />} />
                 <Route path="account" element={<Account />} />

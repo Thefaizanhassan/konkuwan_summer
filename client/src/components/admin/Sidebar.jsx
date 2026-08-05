@@ -11,6 +11,7 @@ const menuItems = [
   { to: '/admin/customers', labelKey: 'nav.customers', icon: '👥' },
   { to: '/admin/inquiries', labelKey: 'nav.inquiries', icon: '📬' },
   { to: '/admin/challans',  labelKey: 'nav.challans',  icon: '📥' },
+  { to: '/admin/warehouses',labelKey: 'nav.warehouses',icon: '🏬' },
   { to: '/admin/finance',   labelKey: 'nav.finance',   icon: '💰' },
   { to: '/admin/farm',      labelKey: 'nav.farm',      icon: '🚜' },
   { to: '/admin/users',     labelKey: 'nav.users',     icon: '👤', roles: ['super_admin'] },

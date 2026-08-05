@@ -12,6 +12,7 @@ const settingsAdminRoutes = require('./routes/settings.admin.routes');
 const customerAdminRoutes = require('./routes/customer.admin.routes');
 const orderAdminRoutes = require('./routes/order.admin.routes');
 const challanAdminRoutes = require('./routes/challan.admin.routes');
+const warehouseAdminRoutes = require('./routes/warehouse.admin.routes');
 
 // Product routes
 const productPublicRoutes = require('./routes/product.public.routes');
@@ -93,6 +94,7 @@ app.use('/api/admin/farm', farmAdminRoutes);
 app.use('/api/admin/customers', customerAdminRoutes);
 app.use('/api/admin/orders', orderAdminRoutes);
 app.use('/api/admin/challans', challanAdminRoutes);
+app.use('/api/admin/warehouses', warehouseAdminRoutes);
 
 // Products
 app.use('/api/products', productPublicRoutes);
