@@ -12,7 +12,8 @@ exports.getMe = async (req, res) => {
 exports.updatePreferences = async (req, res, next) => {
   try {
     const { language } = req.body;
-    const SUPPORTED = ['en', 'or'];
+    // Mirrors SUPPORTED_LANGUAGES in client/src/i18n/index.js.
+    const SUPPORTED = ['en', 'or', 'hi'];
     if (!SUPPORTED.includes(language)) {
       return next(new AppError(`Unsupported language. Supported: ${SUPPORTED.join(', ')}.`, 400));
     }

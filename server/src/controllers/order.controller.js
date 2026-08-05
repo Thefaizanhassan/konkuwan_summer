@@ -10,6 +10,11 @@ const {
 const ORDER_SELECT =
   '*, customer:customers(*), items:order_items(*, product:products(id,name,slug,unit,hsn_code))';
  
+// A line is either a catalogue product or a free-text one. Everything that
+// renders a line — invoice, quotation, order detail — must agree on which
+// name wins, so it is resolved in one place.
+const lineName = (it) => it.product?.name || it.product_name || '—';
+
 // Fetch several settings rows as a plain map { key: value }
 async function getSettings(keys) {
   const { data } = await supabase.from('settings').select('key,value').in('key', keys);
@@ -103,7 +108,8 @@ exports.createOrder = async (req, res, next) => {
 
     const items = value.items.map((it) => ({
       order_id: order.id,
-      product_id: it.product_id,
+      product_id: it.product_id || null,
+      product_name: it.product_id ? null : (it.product_name || null),
       quantity: it.quantity,
       unit: it.unit || 'kg',
       unit_price: it.unit_price,
@@ -199,7 +205,7 @@ exports.generateInvoice = async (req, res, next) => {
       const amount = Number(it.quantity) * rate;
       const igst = +(amount * taxPercent / 100).toFixed(2);
       return {
-        product: it.product?.name,
+        product: lineName(it),
         hsn: it.product?.hsn_code || null,
         quantity: Number(it.quantity),
         unit: it.unit,
@@ -278,7 +284,7 @@ exports.generateQuotation = async (req, res, next) => {
     const items = (order.items || []).map((it) => {
       const rate = it.final_price != null ? Number(it.final_price) : Number(it.unit_price);
       return {
-        product: it.product?.name,
+        product: lineName(it),
         quantity: Number(it.quantity),
         unit: it.unit,
         rate,

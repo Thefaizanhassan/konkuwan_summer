@@ -77,7 +77,7 @@ export default function UserManagement() {
               updateMutation.mutate({ id: editingUser.id, ...formData });
             } else {
               apiClient
-                .post('/admin/users/invite', { email: formData.email, role: formData.role })
+                .post('/admin/users/invite', { email: formData.email, role: formData.role, dashboard_widgets: formData.dashboard_widgets })
                 .then(() => {
                   queryClient.invalidateQueries(['admin-users']);
                   setModalOpen(false);
@@ -99,9 +99,31 @@ function UserFormModal({ user, onClose, onSubmit, isLoading }) {
     email: user?.email || '',
     role: user?.profile?.role || user?.role || 'viewer',
     is_active: user?.profile?.is_active ?? user?.is_active ?? true,
+    dashboard_widgets: user?.profile?.dashboard_widgets || [],
   });
 
-  const ROLES = ['super_admin', 'product_manager', 'order_manager', 'farm_manager', 'viewer'];
+  // The grantable list comes from the server so this screen cannot drift from
+  // what the API will actually honour.
+  const { data: widgets } = useQuery({
+    queryKey: ['dashboard-widgets'],
+    queryFn: () => apiClient.get('/admin/users/dashboard-widgets').then((r) => r.data.data),
+    staleTime: Infinity,
+  });
+ 
+  const isStakeholder = form.role === 'stakeholder';
+  const grouped = (widgets || []).reduce((acc, w) => {
+    (acc[w.group] = acc[w.group] || []).push(w);
+    return acc;
+  }, {});
+  const toggleWidget = (key) =>
+    setForm((f) => ({
+      ...f,
+      dashboard_widgets: f.dashboard_widgets.includes(key)
+        ? f.dashboard_widgets.filter((k) => k !== key)
+        : [...f.dashboard_widgets, key],
+    }));
+ 
+  const ROLES = ['super_admin', 'product_manager', 'order_manager', 'farm_manager', 'viewer', 'stakeholder'];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -151,6 +173,51 @@ function UserFormModal({ user, onClose, onSubmit, isLoading }) {
             ))}
           </select>
         </div>
+
+        {/* Per-stakeholder dashboard grants. Each account is configured
+            independently; nothing is granted by default. */}
+        {isStakeholder && (
+          <div className="rounded-xl p-4" style={{ background: '#F4EFE6' }}>
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+              <p className="text-sm font-semibold text-forest">{t('users.dashboardAccess')}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-muted">
+                  {t('users.widgetsGranted', { count: form.dashboard_widgets.length, total: (widgets || []).length })}
+                </span>
+                <button type="button" className="text-[11px] underline text-sage"
+                  onClick={() => setForm(f => ({ ...f, dashboard_widgets: (widgets || []).map(w => w.key) }))}>
+                  {t('users.selectAll')}
+                </button>
+                <button type="button" className="text-[11px] underline text-sage"
+                  onClick={() => setForm(f => ({ ...f, dashboard_widgets: [] }))}>
+                  {t('users.clearAll')}
+                </button>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted mb-3">{t('users.dashboardAccessHint')}</p>
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+              {Object.entries(grouped).map(([group, ws]) => (
+                <div key={group}>
+                  <p className="text-[10px] uppercase tracking-wide text-muted mb-1">
+                    {t(`widgetGroups.${group}`, group)}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                    {ws.map((w) => (
+                      <label key={w.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={form.dashboard_widgets.includes(w.key)}
+                          onChange={() => toggleWidget(w.key)}
+                        />
+                        <span>{t(`widgets.${w.key}`, w.key)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {user && (
           <div className="flex items-center gap-2">

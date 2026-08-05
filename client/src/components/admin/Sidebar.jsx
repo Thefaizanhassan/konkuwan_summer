@@ -4,18 +4,25 @@ import { useAuth } from '../../contexts/AuthContext';
 import logo from '../../assets/konkuwan_logo_white.svg';
 
 // labelKey resolves through i18n so the menu follows the selected language.
+//
+// `roles` is an allow-list. Every entry names its roles explicitly rather than
+// relying on the absence of the key, because the filter treats a missing
+// `roles` as "everyone" — and a stakeholder must never be in "everyone".
+const STAFF = ['super_admin', 'product_manager', 'order_manager', 'farm_manager', 'viewer'];
+ 
 const menuItems = [
-  { to: '/admin', labelKey: 'nav.dashboard',   icon: '📊', end: true  },
-  { to: '/admin/products',  labelKey: 'nav.products',  icon: '🌿' },
-  { to: '/admin/orders',    labelKey: 'nav.orders',    icon: '📦' },
-  { to: '/admin/customers', labelKey: 'nav.customers', icon: '👥' },
-  { to: '/admin/inquiries', labelKey: 'nav.inquiries', icon: '📬' },
-  { to: '/admin/challans',  labelKey: 'nav.challans',  icon: '📥' },
-  { to: '/admin/warehouses',labelKey: 'nav.warehouses',icon: '🏬' },
-  { to: '/admin/finance',   labelKey: 'nav.finance',   icon: '💰' },
-  { to: '/admin/farm',      labelKey: 'nav.farm',      icon: '🚜' },
+  // The only entry a stakeholder sees.
+  { to: '/admin', labelKey: 'nav.dashboard',   icon: '📊', end: true, roles: [...STAFF, 'stakeholder'] },
+  { to: '/admin/products',  labelKey: 'nav.products',  icon: '🌿', roles: STAFF },
+  { to: '/admin/orders',    labelKey: 'nav.orders',    icon: '📦', roles: STAFF },
+  { to: '/admin/customers', labelKey: 'nav.customers', icon: '👥', roles: STAFF },
+  { to: '/admin/inquiries', labelKey: 'nav.inquiries', icon: '📬', roles: STAFF },
+  { to: '/admin/challans',  labelKey: 'nav.challans',  icon: '📥', roles: STAFF },
+  { to: '/admin/warehouses',labelKey: 'nav.warehouses',icon: '🏬', roles: STAFF },
+  { to: '/admin/finance',   labelKey: 'nav.finance',   icon: '💰', roles: STAFF },
+  { to: '/admin/farm',      labelKey: 'nav.farm',      icon: '🚜', roles: STAFF },
   { to: '/admin/users',     labelKey: 'nav.users',     icon: '👤', roles: ['super_admin'] },
-  { to: '/admin/audit-logs',labelKey: 'nav.auditLogs', icon: '📜' },
+  { to: '/admin/audit-logs',labelKey: 'nav.auditLogs', icon: '📜', roles: STAFF },
   { to: '/admin/settings',  labelKey: 'nav.settings',  icon: '⚙️', roles: ['super_admin'] },
 ];
 

@@ -98,9 +98,10 @@ exports.getCustomerProfile = async (req, res, next) => {
     const productMap = {};
     billable.forEach((o) => {
       (o.items || []).forEach((it) => {
-        const key = it.product?.id || it.product?.name || 'unknown';
+        // Custom lines have no products row, so group them by their name.
+        const key = it.product?.id || it.product?.name || it.product_name || 'unknown';
         if (!productMap[key]) {
-          productMap[key] = { product: it.product?.name || '—', unit: it.unit || it.product?.unit || 'kg', quantity: 0, spend: 0 };
+          productMap[key] = { product: it.product?.name || it.product_name || '—', unit: it.unit || it.product?.unit || 'kg', quantity: 0, spend: 0 };
         }
         productMap[key].quantity += Number(it.quantity || 0);
         productMap[key].spend += Number(it.final_price != null ? it.final_price * it.quantity : it.line_total || 0);

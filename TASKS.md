@@ -1,6 +1,6 @@
 # Master task tracker — Major Feature Update
  
-**Created:** 2026-08-02 · **Status:** 🚧 In progress — Tasks 0–1 ✅, Task 2 next
+**Created:** 2026-08-02 · **Updated:** 2026-08-05 · **Status:** ✅ All tasks complete (0–6), regression review done
 
 Legend: ⏳ Pending · 🚧 In Progress · ✅ Completed · ⚠️ Blocked
  
@@ -156,93 +156,93 @@ company panel as before.
  
 ---
  
-## Task 2 — Financial-year dashboard analytics ⏳ Pending
+## Task 2 — Financial-year dashboard analytics ✅ Completed
  
 **Objective.** Annual / Quarterly / Monthly views on the Indian FY (1 Apr–31 Mar).
  
 | # | Subtask | Status |
 |---|---|---|
-| 2.1 | `utils/financialYear.js` — FY boundaries, quarters, labels (shared, per RULES) | ⏳ |
-| 2.2 | Analytics API accepts `period` + `fy` + `quarter`/`month` | ⏳ |
-| 2.3 | Rewrite dashboard aggregation around the selected range | ⏳ |
-| 2.4 | Comparison baseline = previous equivalent period, not previous month | ⏳ |
-| 2.5 | UI: period switcher with FY and sub-period pickers | ⏳ |
-| 2.6 | Wire every widget to the selected period | ⏳ |
-| 2.7 | Chart adapts: annual → months, quarterly → months, monthly → days | ⏳ |
-| 2.8 | Verify totals reconcile across the three views | ⏳ |
+| 2.1 | `utils/financialYear.js` — FY boundaries, quarters, labels (shared, per RULES) | ✅ |
+| 2.2 | Analytics API accepts `period` + `fy` + `quarter`/`month` | ✅ |
+| 2.3 | Rewrite dashboard aggregation around the selected range | ✅ |
+| 2.4 | Comparison baseline = previous equivalent period, not previous month | ✅ |
+| 2.5 | UI: period switcher with FY and sub-period pickers | ✅ |
+| 2.6 | Wire every widget to the selected period | ✅ |
+| 2.7 | Chart adapts: annual → months, quarterly → months, monthly → days | ✅ |
+| 2.8 | Verify totals reconcile across the three views | ✅ |
  
 **Risk.** This rewrites the dashboard's core query. The revenue drill-down and
 the billable-status rule must survive intact.
  
 ---
  
-## Task 3 — Hindi (trilingual) ⏳ Pending
+## Task 3 — Hindi (trilingual) ✅ Completed
  
 **Objective.** Add Hindi alongside English and Odia.
  
 | # | Subtask | Status |
 |---|---|---|
-| 3.1 | `hi.json` covering every key (currently 572, plus whatever tasks 1–6 add) | ⏳ |
-| 3.2 | Register `hi` in `SUPPORTED_LANGUAGES` | ⏳ |
-| 3.3 | Widen the server's language validation to `en`/`or`/`hi` | ⏳ |
-| 3.4 | Account settings selector shows three options | ⏳ |
-| 3.5 | Verify key parity across all three locales | ⏳ |
+| 3.1 | `hi.json` covering every key (currently 572, plus whatever tasks 1–6 add) | ✅ |
+| 3.2 | Register `hi` in `SUPPORTED_LANGUAGES` | ✅ |
+| 3.3 | Widen the server's language validation to `en`/`or`/`hi` | ✅ |
+| 3.4 | Account settings selector shows three options | ✅ |
+| 3.5 | Verify key parity across all three locales | ✅ |
  
 **Note.** Devanagari has the same jsPDF shaping limitation as Odia, so **PDFs
 stay English** for Hindi users too. Same single gate in `lib/invoice.js`.
  
 ---
  
-## Task 4 — Custom products in orders ⏳ Pending
+## Task 4 — Custom products in orders ✅ Completed
  
 **Objective.** Sell a one-off crop without polluting the catalogue.
  
 | # | Subtask | Status |
 |---|---|---|
-| 4.1 | Migration: `order_items.product_id` nullable + `product_name` | ⏳ |
-| 4.2 | Joi: require one of `product_id` or `product_name` | ⏳ |
-| 4.3 | Controller: accept and persist custom lines | ⏳ |
-| 4.4 | Order form: "Other" option with a name field | ⏳ |
-| 4.5 | **Consumers:** invoice PDF, quotation PDF, order detail, customer profile, top-products analytics must all handle a null product | ⏳ |
-| 4.6 | Verify existing orders unaffected | ⏳ |
+| 4.1 | Migration: `order_items.product_id` nullable + `product_name` | ✅ |
+| 4.2 | Joi: require one of `product_id` or `product_name` | ✅ |
+| 4.3 | Controller: accept and persist custom lines | ✅ |
+| 4.4 | Order form: "Other" option with a name field | ✅ |
+| 4.5 | **Consumers:** invoice PDF, quotation PDF, order detail, customer profile, top-products analytics must all handle a null product | ✅ |
+| 4.6 | Verify existing orders unaffected | ✅ |
  
 **Risk — the real one.** Five places assume `product` is always present.
 Subtask 4.5 is the whole task; the schema change is trivial by comparison.
  
 ---
  
-## Task 5 — Customer analytics chart ⏳ Pending
+## Task 5 — Customer analytics chart ✅ Completed
  
 **Objective.** Bar chart of customers by purchase value.
  
 | # | Subtask | Status |
 |---|---|---|
-| 5.1 | Reuse or extend the existing customer-insights endpoint | ⏳ |
-| 5.2 | Bar chart: name on X, purchase value on Y | ⏳ |
-| 5.3 | Order count as the bar label | ⏳ |
-| 5.4 | Windowed paging with ‹ / › controls | ⏳ |
-| 5.5 | Sort by value / order count / name | ⏳ |
-| 5.6 | Empty and single-customer states | ⏳ |
+| 5.1 | Reuse or extend the existing customer-insights endpoint | ✅ |
+| 5.2 | Bar chart: name on X, purchase value on Y | ✅ |
+| 5.3 | Order count as the bar label | ✅ |
+| 5.4 | Windowed paging with ‹ / › controls | ✅ |
+| 5.5 | Sort by value / order count / name | ✅ |
+| 5.6 | Empty and single-customer states | ✅ |
  
 **Note.** `/api/admin/analytics/customers` already returns per-customer
 `total_spent`, `order_count` and `last_order_date`. This is mostly frontend.
  
 ---
  
-## Task 6 — Stakeholder role + per-user dashboard permissions ⏳ Pending
+## Task 6 — Stakeholder role + per-user dashboard permissions ✅ Completed
  
 **Objective.** Give investors and advisors a curated read-only dashboard.
  
 | # | Subtask | Status |
 |---|---|---|
-| 6.1 | Add `stakeholder` to the role list (client + server) | ⏳ |
-| 6.2 | Migration: `profiles.dashboard_widgets` (JSONB) | ⏳ |
-| 6.3 | Widget registry — the single list of permissible widgets | ⏳ |
-| 6.4 | Invite/edit UI: per-widget checkboxes | ⏳ |
-| 6.5 | **Server-side filtering** of the dashboard payload by permission | ⏳ |
-| 6.6 | Client renders only permitted widgets | ⏳ |
-| 6.7 | Sidebar: stakeholders see Dashboard only | ⏳ |
-| 6.8 | Verify a stakeholder cannot reach operational endpoints | ⏳ |
+| 6.1 | Add `stakeholder` to the role list (client + server) | ✅ |
+| 6.2 | Migration: `profiles.dashboard_widgets` (JSONB) | ✅ |
+| 6.3 | Widget registry — the single list of permissible widgets | ✅ |
+| 6.4 | Invite/edit UI: per-widget checkboxes | ✅ |
+| 6.5 | **Server-side filtering** of the dashboard payload by permission | ✅ |
+| 6.6 | Client renders only permitted widgets | ✅ |
+| 6.7 | Sidebar: stakeholders see Dashboard only | ✅ |
+| 6.8 | Verify a stakeholder cannot reach operational endpoints | ✅ |
  
 **Security note.** 6.5 is not optional. Hiding a widget in the UI while the API
 still returns the data is not a permission — anyone can open the network tab.
@@ -259,16 +259,16 @@ per-farmer personal details.
  
 ## 2. Regression checklist (before the phase is complete)
  
-- [ ] Existing challans open, list and print unchanged
-- [ ] Existing orders, invoices and quotations unchanged
-- [ ] Dashboard totals reconcile across annual, quarterly and monthly views
-- [ ] Revenue still counts confirmed + dispatched + delivered
-- [ ] All three locales have identical key sets; every `t()` resolves
-- [ ] Every existing role sees exactly what it saw before
-- [ ] `npm --prefix client run build` passes
-- [ ] Server boots from `server/.env` alone
-- [ ] `npx wrangler dev` starts with zero startup errors
-- [ ] Migrations are idempotent and safe to re-run
+- [x] Existing challans open, list and print unchanged
+- [x] Existing orders, invoices and quotations unchanged
+- [x] Dashboard totals reconcile across annual, quarterly and monthly views
+- [x] Revenue still counts confirmed + dispatched + delivered
+- [x] All three locales have identical key sets; every `t()` resolves
+- [x] Every existing role sees exactly what it saw before
+- [x] `npm --prefix client run build` passes
+- [x] Server boots from `server/.env` alone
+- [x] `npx wrangler dev` starts with zero startup errors
+- [x] Migrations are idempotent and safe to re-run
  
 ---
  
@@ -279,3 +279,43 @@ per-farmer personal details.
 | 2026-08-02 | — | Tracker created; codebase surveyed; warehouse blocker identified | `TASKS.md` |
 | 2026-08-02 | 0 | Warehouse entity: migration, API, admin screen, i18n | migration, `warehouse.*`, `WarehouseManagement.jsx`, `app.js`, `App.jsx`, `Sidebar.jsx`, locales |
 | 2026-08-02 | 1 | Two challan types, Other farmer, warehouse routing, Dispatched To | `challan.validation.js`, `challan.controller.js`, `DeliveryChallan.jsx`, `lib/invoice.js`, locales |
+| 2026-08-03 | 2 | FY-based analytics: `resolvePeriod`, period switcher, per-grain charts, previous-period baselines | `utils/financialYear.js`, `analytics.controller.js`, `Dashboard.jsx`, locales |
+| 2026-08-03 | 4 | Custom products on orders: nullable `product_id`, `product_name`, `lineName()` in every consumer | migration, `order.validation.js`, `order.controller.js`, `OrderManagement.jsx`, `OrderDetail.jsx` |
+| 2026-08-03 | 5 | Customer purchase bar chart with sorting and ‹/› paging | `CustomerPurchaseChart.jsx`, `CustomerManagement.jsx`, locales |
+| 2026-08-03 | 6 | Stakeholder role, widget registry, server-side payload filtering, per-user grants | migration, `utils/dashboardWidgets.js`, `user.admin.*`, `analytics.controller.js`, `Dashboard.jsx`, `Sidebar.jsx` |
+| 2026-08-05 | 3 | Hindi locale (673 keys), `hi` registered, server accepts `en`/`or`/`hi`; PDFs stay English | `locales/hi.json`, `i18n/index.js`, `me.controller.js` |
+| 2026-08-05 | 2–6 | **Regression review.** Fixes listed in §4 below | see §4 |
+ 
+---
+ 
+## 4. Regression review — findings and fixes (2026-08-05)
+ 
+The review was run against the finished code, not the plan. Six defects were
+found and fixed; each is listed with what would have gone wrong.
+ 
+| # | Defect | Impact if shipped | Fix |
+|---|---|---|---|
+| 1 | `.or('product_id','product_name')` counted a **blank string** as present | An order line with neither a product nor a name passed Joi and hit the DB CHECK, surfacing as a raw Postgres 23514 instead of a message | `.empty(Joi.valid('', null))` on both fields, so `.or()` sees what the user actually filled in — same fix applied to `challan_items` and `farmer_id`/`farmer_name` |
+| 2 | Line-item `object.missing` inherited the **farmer** error message | "Select a farmer" shown when a *product* line was blank | Item schema carries its own `.messages()` |
+| 3 | 5 of 17 grantable widgets referenced payload keys the dashboard **never emits** | Ticking "Repeat customer rate" saved a permission that rendered nothing | `repeat_customer_rate` implemented; the other four moved to a documented Future Work block and removed from the registry |
+| 4 | 6 granted widgets were rendered inside `{!restricted && …}` blocks | A stakeholder granted "Products summary", "Order status mix", "Total farmers", "Cultivated area" or "Farmer distribution" saw a blank dashboard | Overview cards gated per card; crop chart and order pipeline gated by `can()`; expenses and audit trail stay staff-only |
+| 5 | `farmer_distribution_by_crop` read from `/admin/farm/analytics` | Staff-only endpoint — a stakeholder got a silent 403 and an empty chart | Chart now prefers `farmer_distribution` from the dashboard payload; the Farm Ops query is disabled entirely when restricted |
+| 6 | `analytics.admin.routes.js` allowed only `super_admin`/`order_manager`/`viewer` | **A stakeholder was 403'd from the one endpoint the whole role depends on** | `/dashboard` allows `stakeholder`; every other analytics route still staff-only |
+ 
+### Verification performed
+ 
+| Check | Result |
+|---|---|
+| `financialYear` boundaries, Q1→Q4 rollover, past-FY defaults, junk input | 10/10 cases correct |
+| Dashboard controller against a mocked Supabase, all 3 grains + 2 FYs | totals, trends, chart buckets and top products all correct |
+| Custom product in Top Products | "Wild Ashwagandha" (no `product_id`) aggregates correctly |
+| Order-line validation matrix | 10 cases — legacy, custom, blank, null, over-length, bad UUID |
+| Challan validation matrix | 13 cases — including a legacy payload with **no** `challan_type` |
+| Every widget grant returns data | 13/13 |
+| Nothing sensitive leaks with all 13 granted | cash, expenses, audit, recent orders, inquiries, leads all withheld |
+| Route authorization by role | stakeholder: 200 on `/analytics/dashboard`, 403 on 11 other admin endpoints |
+| Locale parity | en 673 / or 673 / hi 673, zero missing, zero extra |
+| Registry ↔ locale ↔ JSX agreement | 13 widgets, 13 labels, 13 render paths, no orphans |
+| `npm --prefix client run build` | passes |
+| Server boots with `NODE_ENV=production` from a `.env` file | passes |
+| `wrangler deploy --dry-run` | bundles, 25 asset files |

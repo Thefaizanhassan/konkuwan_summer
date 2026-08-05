@@ -11,6 +11,7 @@ router.use(authenticate);
 router.use(authorize('super_admin'));
 
 // Users
+router.get('/dashboard-widgets', userAdminController.listDashboardWidgets);
 router.get('/', userAdminController.listUsers);
 
 router.put('/:id', userAdminController.updateUser);

@@ -165,7 +165,22 @@
     "dailyRevenue": "Daily revenue",
     "backToMonths": "Back to 12 months",
     "clickMonthHint": "Click a month for a day-by-day view",
-    "noRevenueMonth": "No sales recorded in {{month}}"
+    "noRevenueMonth": "No sales recorded in {{month}}",
+    "restrictedView": "You are seeing a limited dashboard configured for your account.",
+    "noWidgets": "No dashboard metrics have been shared with your account yet. Ask an administrator to grant access.",
+    "periodAnnual": "Annual",
+    "periodQuarterly": "Quarterly",
+    "periodMonthly": "Monthly",
+    "financialYear": "Financial Year",
+    "quarter": "Quarter",
+    "month": "Month",
+    "comparedTo": "vs {{label}}",
+    "revenuePeriod": "Revenue",
+    "ordersPeriod": "Orders",
+    "avgOrderValue": "Avg. order value",
+    "fulfilmentRate": "Fulfilment rate",
+    "repeatCustomerRate": "Repeat customer rate",
+    "farmerDistribution": "Farmers by crop"
   },
   "products": {
     "title": "Products",
@@ -252,7 +267,19 @@
       "totalSpend": "Total Spend",
       "orderHistory": "Order History",
       "noOrders": "No orders yet."
-    }
+    },
+    "analytics": "Customer Analytics",
+    "purchaseByCustomer": "Purchase value by customer",
+    "sortBy": "Sort by",
+    "sortValue": "Purchase value",
+    "sortOrders": "Order count",
+    "sortName": "Name (A–Z)",
+    "ordersLabel": "{{count}} orders",
+    "ordersLabel_one": "{{count}} order",
+    "showingRange": "Showing {{from}}–{{to}} of {{total}}",
+    "noCustomerData": "No purchases recorded yet.",
+    "hideChart": "Hide chart",
+    "showChart": "Show chart"
   },
   "orders": {
     "title": "Orders",
@@ -284,7 +311,10 @@
       "dispatched": "Dispatched",
       "delivered": "Delivered",
       "cancelled": "Cancelled"
-    }
+    },
+    "otherProduct": "Other (not in catalogue)",
+    "customProductName": "Product / crop name",
+    "customProductHint": "Sold on this order only — not added to the product list."
   },
   "inquiries": {
     "title": "Inquiries",
@@ -531,7 +561,8 @@
       "product_manager": "Product Manager",
       "order_manager": "Order Manager",
       "farm_manager": "Farm Manager",
-      "viewer": "Viewer"
+      "viewer": "Viewer",
+      "stakeholder": "Stakeholder"
     },
     "adminUsers": "Admin Users",
     "alreadyInactive": "Already inactive",
@@ -539,7 +570,12 @@
     "inviteNew": "Invite New User",
     "sendInvite": "Send Invite",
     "saveChanges": "Save Changes",
-    "inviteFailed": "Failed to send invitation"
+    "inviteFailed": "Failed to send invitation",
+    "dashboardAccess": "Dashboard access",
+    "dashboardAccessHint": "Choose exactly which metrics this stakeholder can see. Everything else is withheld by the server, not just hidden.",
+    "selectAll": "Select all",
+    "clearAll": "Clear all",
+    "widgetsGranted": "{{count}} of {{total}} selected"
   },
   "audit": {
     "title": "Audit Logs",
@@ -673,5 +709,27 @@
     "none": "No warehouses yet. Add one to start recording stock movements.",
     "saveFailed": "Could not save the warehouse.",
     "inactiveHint": "Inactive warehouses are hidden from new challans."
+  },
+  "widgets": {
+    "revenue_period": "Revenue (current period)",
+    "revenue_trends": "Revenue trends",
+    "average_order_value": "Average order value",
+    "orders_period": "Orders (current period)",
+    "order_status_mix": "Order status mix",
+    "fulfilment_rate": "Order fulfilment rate",
+    "customers_total": "Total customers",
+    "repeat_customer_rate": "Repeat customer rate",
+    "products_summary": "Products summary",
+    "top_products": "Top products",
+    "farmers_total": "Total farmers",
+    "farmer_distribution_by_crop": "Farmer distribution by crop",
+    "cultivated_area": "Total cultivated area"
+  },
+  "widgetGroups": {
+    "revenue": "Revenue",
+    "orders": "Orders",
+    "customers": "Customers",
+    "products": "Products",
+    "farm": "Farm"
   }
 }

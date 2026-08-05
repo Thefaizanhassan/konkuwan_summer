@@ -229,12 +229,14 @@ function CreateOrderModal({ onClose, onSubmit, isLoading, error }) {
 
   const [customerId, setCustomerId] = useState('');
   const [note, setNote] = useState('');
-  const [items, setItems] = useState([{ product_id: '', quantity: '', unit: 'kg', unit_price: '' }]);
+  const [items, setItems] = useState([{ product_id: '', product_name: '', quantity: '', unit: 'kg', unit_price: '' }]);
 
   const setItem = (i, patch) =>
     setItems(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
 
+  // 'other' is a sentinel, not an id: it switches the row to a free-text name.
   const onProductPick = (i, product_id) => {
+    if (product_id === 'other') return setItem(i, { product_id: 'other', product_name: '', unit: 'kg' });
     const p = products?.find(x => x.id === product_id);
     setItem(i, {
       product_id,
@@ -247,7 +249,8 @@ function CreateOrderModal({ onClose, onSubmit, isLoading, error }) {
     (s, it) => s + (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_price) || 0), 0
   );
 
-  const canSubmit = customerId && items.every(it => it.product_id && parseFloat(it.quantity) > 0 && parseFloat(it.unit_price) > 0);
+  const itemNamed = (it) => (it.product_id === 'other' ? it.product_name.trim() : it.product_id);
+  const canSubmit = customerId && items.every(it => itemNamed(it) && parseFloat(it.quantity) > 0 && parseFloat(it.unit_price) > 0);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -255,7 +258,10 @@ function CreateOrderModal({ onClose, onSubmit, isLoading, error }) {
       customer_id: customerId,
       final_note: note || null,
       items: items.map(it => ({
-        product_id: it.product_id,
+        // A custom line sends a name instead of an id; the server stores it on
+        // the line and never touches the product catalogue.
+        product_id: it.product_id === 'other' ? null : it.product_id,
+        product_name: it.product_id === 'other' ? it.product_name.trim() : null,
         quantity: parseFloat(it.quantity),
         unit: it.unit,
         unit_price: parseFloat(it.unit_price),
@@ -282,11 +288,21 @@ function CreateOrderModal({ onClose, onSubmit, isLoading, error }) {
           <label className="block text-xs uppercase tracking-wide text-muted mb-1">{t('orders.lineItems')} *</label>
           {items.map((it, i) => (
             <div key={i} className="grid grid-cols-[2fr_1fr_1fr_auto] gap-2 mb-2 items-center">
-              <select required value={it.product_id} onChange={e => onProductPick(i, e.target.value)}
-                className="border border-border rounded-sm px-2 py-2 text-sm">
-                <option value="">{t('common.product')}…</option>
-                {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <div>
+                <select required value={it.product_id} onChange={e => onProductPick(i, e.target.value)}
+                  className="w-full border border-border rounded-sm px-2 py-2 text-sm">
+                  <option value="">{t('common.product')}…</option>
+                  {products?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  <option value="other">{t('orders.otherProduct')}</option>
+                </select>
+                {it.product_id === 'other' && (
+                  <>
+                    <Input required className="mt-1" placeholder={t('orders.customProductName')}
+                      value={it.product_name} onChange={e => setItem(i, { product_name: e.target.value })} />
+                    <p className="text-[11px] text-muted mt-0.5">{t('orders.customProductHint')}</p>
+                  </>
+                )}
+              </div>
               <Input required type="number" min="0.01" step="any" placeholder={`Qty (${it.unit})`}
                 value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} />
               <Input required type="number" min="0.01" step="any" placeholder={t('orders.unitPrice')}
@@ -296,7 +312,7 @@ function CreateOrderModal({ onClose, onSubmit, isLoading, error }) {
             </div>
           ))}
           <button type="button"
-            onClick={() => setItems([...items, { product_id: '', quantity: '', unit: 'kg', unit_price: '' }])}
+            onClick={() => setItems([...items, { product_id: '', product_name: '', quantity: '', unit: 'kg', unit_price: '' }])}
             className="text-sm text-sage hover:text-forest">+ {t('orders.addLine')}</button>
         </div>
 

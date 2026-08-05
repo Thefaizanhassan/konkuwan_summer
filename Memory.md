@@ -20,7 +20,7 @@ React 19 SPA + Express API, both deployed as a **single Cloudflare Worker**. Dat
  
 ### Completed
  
-Foundation · Authentication and roles · Products, categories, customers, audit, settings · Orders with a full status lifecycle · Quotations · Invoices · Delivery challans · FarmOps (CropOS, FarmerOS, War Room) · Dashboard and analytics · Finance · Public site and enquiry capture · English/Odia localisation · Cloudflare Worker configuration.
+Foundation · Authentication and roles · Products, categories, customers, audit, settings · Orders with a full status lifecycle (catalogue **and** off-catalogue lines) · Quotations · Invoices · Warehouses · Delivery challans (farmer→warehouse and warehouse→warehouse) · FarmOps (CropOS, FarmerOS, War Room) · Financial-year dashboard analytics · Customer purchase analytics · Stakeholder role with per-user dashboard grants · Finance · Public site and enquiry capture · English/Odia/**Hindi** localisation · Cloudflare Worker configuration.
  
 See [Phases.md](./Phases.md) for the phase-by-phase checklist.
  
@@ -95,6 +95,14 @@ Reverse chronological. Dates are when the work landed.
 **Files:** `wrangler.jsonc`, `worker.js` (new), removed `server/src/models/**`, legacy auth, `config/database.js`; `middlewares/upload.js`, `product.controller.js`, `utils/logger.js`, `client/src/services/api.js`
 **Why:** First deploy served a blank page — no wrangler config, so it uploaded `client/` including `node_modules` and served the unbuilt Vite template. Also removed Workers-incompatible dependencies, moved uploads to Supabase Storage, and replaced Winston file transports with a console sink.
  
+### 2026-08-05 — Trilingual admin panel and regression review
+**Files:** `client/src/i18n/locales/hi.json` (new), `i18n/index.js`, `server/src/controllers/me.controller.js`, `routes/analytics.admin.routes.js`, `utils/dashboardWidgets.js`, `validations/order.validation.js`, `validations/challan.validation.js`, `controllers/analytics.controller.js`, `pages/admin/Dashboard.jsx`, all three locales
+**Why:** Added Hindi (673 keys, three-way parity). The regression review over Tasks 2–6 then found six defects — the worst being that a stakeholder was 403'd from `/api/admin/analytics/dashboard`, the one endpoint the whole role depends on, and that six granted widgets rendered nothing because they sat inside `{!restricted && …}` blocks. All fixed; see `TASKS.md` §4 for the full table.
+ 
+### 2026-08-02/03 — Warehouses, challan redesign, FY analytics, custom products, stakeholder role
+**Files:** `database/2026-08-02_*.sql`, `database/2026-08-03_*.sql`, `utils/financialYear.js`, `utils/dashboardWidgets.js`, `warehouse.*`, `WarehouseManagement.jsx`, `CustomerPurchaseChart.jsx`, `DeliveryChallan.jsx`, `analytics.controller.js`, `Dashboard.jsx`, `user.admin.*`
+**Why:** Challans had one shape but two real workflows; the dashboard reported calendar months while the business runs on the Indian financial year; one-off crops could not be sold without polluting the catalogue; and investors needed visibility without operational access.
+ 
 ### 2026-07-30 — Multilingual admin panel and PDF address overflow
 **Files:** `client/src/i18n/**` (new), `server/src/controllers/me.controller.js` (new), `database/2026-07-13_user_language.sql`, `client/src/lib/invoice.js`, most admin pages
 **Why:** Field staff needed Odia. Added i18next with 572 keys per locale, persisted per user. Also fixed long "Billed To" addresses overflowing their panel in generated PDFs.
@@ -112,7 +120,7 @@ Delivery challan printing · customer purchase totals · farmer CSV import/expor
 | **Objective** | Complete Phase 13 — first successful production deploy |
 | **Branch** | `claude/practical-feynman-073rag` |
 | **Blocked on** | Cloudflare dashboard configuration (secrets), not code |
-| **Recently touched** | `analytics.controller.js`, `Dashboard.jsx`, `orderStatus.js`, `config/index.js`, locales |
+| **Recently touched** | `financialYear.js`, `dashboardWidgets.js`, `analytics.controller.js`, `analytics.admin.routes.js`, `Dashboard.jsx`, `order.validation.js`, `challan.validation.js`, `locales/hi.json` |
  
 **Delivery note.** This session cannot push (`403 denied`), so every change ships as a `git format-patch` file to be applied and pushed locally.
  
@@ -137,6 +145,24 @@ Delivery challan printing · customer purchase totals · farmer CSV import/expor
 **Uploads to Supabase Storage, not R2.** Receipts already used Supabase Storage; adding R2 would mean a second storage system and the AWS SDK in a size-limited Worker.
  
 **Fail loudly at startup.** Missing configuration aborts the boot — on Workers this fails the *deploy* rather than shipping a broken Worker.
+
+**A widget grant is a promise, so the registry only lists what renders.** Four
+widgets (customer analytics, farmer coverage, warehouse summary, inventory
+movement) were designed but have no data in the dashboard payload. Rather than
+offer a checkbox that saves a permission and shows nothing, they are documented
+as Future Work in `utils/dashboardWidgets.js` and are not grantable. Add the
+data first, then the key.
+ 
+**Two gates for the stakeholder role, not one.** The route decides which
+endpoints exist for the role; `filterDashboardForWidgets` decides which fields
+come back from the one endpoint that does. Either alone would be wrong — a route
+check cannot express per-user field grants, and a field filter on an
+unauthorised route is not a gate at all.
+ 
+**Blank strings collapse to undefined before Joi's `.or()`.** `.or()` tests key
+presence, so `product_name: ''` satisfied "one of these is required" and let a
+line through with no product. `.empty(Joi.valid('', null))` makes the rule mean
+what it reads as, and turns a raw Postgres CHECK violation into a sentence.
  
 **Joi aliased to its Node build.** The browser bundle strips the TLD list and throws on `.email()`. Aliasing keeps validation identical in dev and production instead of relaxing each validator.
  
@@ -161,6 +187,7 @@ To find bug 2's scope: `SELECT id, product_id, url FROM product_images WHERE url
  
 Ordered.
  
+0. **Run the two pending migrations** in Supabase — `database/2026-08-02_warehouses_and_challan_types.sql` and `database/2026-08-03_custom_products_and_stakeholder.sql`
 1. **Set Worker secrets** — unblocks everything else
 2. **Set `VITE_*` build variables** — otherwise the deploy succeeds and login silently fails
 3. **Deploy and verify** — `/api/health`, login, dashboard, PDF generation, language switch

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
+import CustomerPurchaseChart from '../../components/admin/CustomerPurchaseChart';
 import DataTable from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import Pagination from '../../components/ui/Pagination';
@@ -131,6 +132,9 @@ export default function CustomerManagement() {
           <Button onClick={() => { setEditingCustomer(null); setModalOpen(true); }}>{t('customers.addCustomer')}</Button>
         </div>
       </div>
+
+      <CustomerPurchaseChart />
+
       <div className="mb-4 flex gap-3 flex-wrap">
         <div className="flex-1 min-w-[220px]">
           <Input

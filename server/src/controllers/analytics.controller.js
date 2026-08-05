@@ -1,6 +1,8 @@
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
 const { BILLABLE_ORDER_STATUSES } = require('../utils/orderStatus');
+const { resolvePeriod, selectableFinancialYears, fyMonthBounds } = require('../utils/financialYear');
+const { filterDashboardForWidgets } = require('../utils/dashboardWidgets');
 
 const monthStart = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const ymd = (d) => d.toISOString().slice(0, 10);
@@ -9,44 +11,59 @@ const pct = (cur, prev) => (prev > 0 ? Number((((cur - prev) / prev) * 100).toFi
 exports.getDashboardStats = async (req, res, next) => {
   try {
     const now = new Date();
-    const somThis = monthStart(now);
-    const somPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const eomPrev = new Date(now.getFullYear(), now.getMonth(), 0);
-    const twelveAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    // Every figure below is scoped to one resolved period — annual, quarterly
+    // or monthly on the Indian financial year — and compared against the
+    // equivalent previous period rather than always "last month".
+    const range = resolvePeriod(req.query, now);
 
-    // Pull the slices we need (small dataset; aggregate in JS)
-    const [{ data: billableYear }, { data: ordersThisMonth }, { data: ordersPrevMonth }, { count: totalCustomers }, { count: custBeforeThis }] =
+    const [{ data: billableRange }, { data: ordersInRange }, { data: ordersPrevRange }, { count: totalCustomers }, { count: custBeforeRange }] =
       await Promise.all([
         // Revenue counts confirmed/dispatched/delivered — matching Finance.
         // Filtering to 'delivered' alone reported 0 for every order that had
         // been invoiced but not yet marked delivered.
-        supabase.from('orders').select('total_amount, order_date, status').in('status', BILLABLE_ORDER_STATUSES).gte('order_date', ymd(twelveAgo)),
-        supabase.from('orders').select('id, status').neq('status', 'cancelled').gte('order_date', ymd(somThis)),
-        supabase.from('orders').select('id, total_amount, status').gte('order_date', ymd(somPrev)).lte('order_date', ymd(eomPrev)),
+        supabase.from('orders').select('total_amount, order_date, status, customer_id').in('status', BILLABLE_ORDER_STATUSES)
+          .gte('order_date', range.start).lte('order_date', range.end),
+        supabase.from('orders').select('id, status').neq('status', 'cancelled')
+          .gte('order_date', range.start).lte('order_date', range.end),
+        supabase.from('orders').select('id, total_amount, status')
+          .gte('order_date', range.previous.start).lte('order_date', range.previous.end),
         supabase.from('customers').select('id', { count: 'exact', head: true }),
-        supabase.from('customers').select('id', { count: 'exact', head: true }).lt('created_at', somThis.toISOString()),
+        supabase.from('customers').select('id', { count: 'exact', head: true }).lt('created_at', `${range.start}T00:00:00Z`),
       ]);
 
-    const revMTD = (billableYear || []).filter((o) => o.order_date >= ymd(somThis)).reduce((s, o) => s + Number(o.total_amount || 0), 0);
-    const ordersMTD = (ordersThisMonth || []).length;
+    const revMTD = (billableRange || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
+    const ordersMTD = (ordersInRange || []).length;
 
-    const revPrev = (ordersPrevMonth || []).filter((o) => BILLABLE_ORDER_STATUSES.includes(o.status)).reduce((s, o) => s + Number(o.total_amount || 0), 0);
-    const ordersPrev = (ordersPrevMonth || []).filter((o) => o.status !== 'cancelled').length;
+    const revPrev = (ordersPrevRange || []).filter((o) => BILLABLE_ORDER_STATUSES.includes(o.status)).reduce((s, o) => s + Number(o.total_amount || 0), 0);
+    const ordersPrev = (ordersPrevRange || []).filter((o) => o.status !== 'cancelled').length;
 
-    // Revenue chart: monthly buckets over last 12 months, plus the same
-    // orders bucketed by day. Both come from the one `billableYear` result,
-    // so the month -> day drill-down costs no extra request; the client just
-    // filters the daily array it already has.
+    // Chart granularity follows the period: a year or quarter is plotted month
+    // by month, a single month day by day. Both series come from the one
+    // `billableRange` result, so switching costs no extra request and the two
+    // can never disagree.
     const buckets = {};
     const dayBuckets = {};
-    (billableYear || []).forEach((o) => {
-      const month = o.order_date.slice(0, 7); // YYYY-MM
-      const day = o.order_date.slice(0, 10); // YYYY-MM-DD
+    (billableRange || []).forEach((o) => {
+      const month = o.order_date.slice(0, 7);
+      const day = o.order_date.slice(0, 10);
       const amount = Number(o.total_amount || 0);
       buckets[month] = (buckets[month] || 0) + amount;
       dayBuckets[day] = (dayBuckets[day] || 0) + amount;
     });
-    const revenue_chart = Object.entries(buckets).sort().map(([month, revenue]) => ({ month: `${month}-01`, revenue }));
+    // A month with no sales must still appear on an annual chart, otherwise the
+    // line silently skips it and the shape lies.
+    const chartMonths = [];
+    if (range.grain === 'month') {
+      const span = range.period === 'year' ? [1, 12] : [(range.quarter - 1) * 3 + 1, (range.quarter - 1) * 3 + 3];
+      for (let m = span[0]; m <= span[1]; m++) {
+        const b = fyMonthBounds(range.fy, m);
+        const key = b.start.slice(0, 7);
+        chartMonths.push({ month: `${key}-01`, revenue: buckets[key] || 0 });
+      }
+    }
+    const revenue_chart = range.grain === 'month'
+      ? chartMonths
+      : Object.entries(buckets).sort().map(([month, revenue]) => ({ month: `${month}-01`, revenue }));
     // Only days that actually have revenue; the client fills the rest of the
     // month with zeroes so a quiet month still renders a full axis.
     const revenue_daily = Object.entries(dayBuckets).sort().map(([date, revenue]) => ({ date, revenue }));
@@ -59,22 +76,23 @@ exports.getDashboardStats = async (req, res, next) => {
       .limit(5);
     const recent_orders = (recent || []).map((o) => ({ ...o, Customer: o.customer }));
 
-    // Top products this month (join items -> orders filtered to delivered/this month)
+    // Top products for the selected period, on the same billable statuses.
     const { data: items } = await supabase
       .from('order_items')
-      .select('quantity, product:products(name, unit), order:orders!inner(status, order_date)')
+      .select('quantity, product_name, product:products(name, unit), order:orders!inner(status, order_date)')
       .in('order.status', BILLABLE_ORDER_STATUSES)
-      .gte('order.order_date', ymd(somThis));
+      .gte('order.order_date', range.start)
+      .lte('order.order_date', range.end);
     const prodMap = {};
     (items || []).forEach((it) => {
-      const name = it.product?.name || '—';
+      const name = it.product?.name || it.product_name || '—';
       if (!prodMap[name]) prodMap[name] = { product_name: name, total_quantity: 0, Product: it.product };
       prodMap[name].total_quantity += Number(it.quantity || 0);
     });
     const top_products = Object.values(prodMap).sort((a, b) => b.total_quantity - a.total_quantity).slice(0, 5);
 
     // ── Operational overview: products, inquiries, farmers, farm finance ──
-    const startOfMonth = ymd(somThis);
+    const startOfMonth = range.start;
     const [
       { count: productsTotal }, { count: productsActive },
       { count: inquiriesNew }, { count: inquiriesTotal },
@@ -89,8 +107,8 @@ exports.getDashboardStats = async (req, res, next) => {
       supabase.from('products').select('id', { count: 'exact', head: true }).eq('is_active', true),
       supabase.from('contact_submissions').select('id', { count: 'exact', head: true }).eq('status', 'new'),
       supabase.from('contact_submissions').select('id', { count: 'exact', head: true }),
-      supabase.from('farmers').select('id, area_decimal, farmer_type, farmer_visits(date)'),
-      supabase.from('expenses').select('type, amount').gte('date', startOfMonth),
+      supabase.from('farmers').select('id, crop, area_decimal, farmer_type, farmer_visits(date)'),
+      supabase.from('expenses').select('type, amount').gte('date', range.start).lte('date', range.end),
       supabase.from('customers').select('id', { count: 'exact', head: true }).eq('lead_status', 'potential_lead'),
       supabase.from('orders').select('status'),
       supabase.from('crop_setups').select('crop_id, area_acres, planting_date'),
@@ -114,17 +132,63 @@ exports.getDashboardStats = async (req, res, next) => {
  
     const cultivatedAcres = (cropSetups || []).reduce((s, c) => s + Number(c.area_acres || 0), 0);
 
-    res.json({
-      success: true,
+    // Headline business metrics that are safe to share with a stakeholder.
+    const billableCount = (billableRange || []).length;
+    const averageOrderValue = billableCount ? Math.round(revMTD / billableCount) : 0;
+    const deliveredCount = (billableRange || []).filter((o) => o.status === 'delivered').length;
+    const fulfilmentRate = billableCount ? Number(((deliveredCount / billableCount) * 100).toFixed(1)) : null;
+ 
+    // Farmers grouped by crop — the "distribution by crop" widget.
+    const cropCounts = {};
+    (farmerRows || []).forEach((f) => {
+      if (!f.crop) return;
+      cropCounts[f.crop] = (cropCounts[f.crop] || 0) + 1;
+    });
+    const farmer_distribution = Object.entries(cropCounts)
+      .map(([crop, count]) => ({ crop, count }))
+      .sort((a, b) => b.count - a.count);
+ 
+    // Share of this period's buyers who bought more than once in it. Scoped to
+    // the period like everything else, so switching to a quarter re-reads it
+    // rather than mixing a lifetime figure into a quarterly view.
+    const ordersPerCustomer = {};
+    (billableRange || []).forEach((o) => {
+      if (!o.customer_id) return;
+      ordersPerCustomer[o.customer_id] = (ordersPerCustomer[o.customer_id] || 0) + 1;
+    });
+    const buyers = Object.values(ordersPerCustomer);
+    const repeatCustomerRate = buyers.length
+      ? Number(((buyers.filter((n) => n > 1).length / buyers.length) * 100).toFixed(1))
+      : 0;
+ 
+    const payload = {
       data: {
+        // What the numbers below are actually for. The client shows this and
+        // uses `financial_years` to populate the picker.
+        period: {
+          period: range.period,
+          fy: range.fy,
+          quarter: range.quarter,
+          month: range.month,
+          label: range.label,
+          start: range.start,
+          end: range.end,
+          grain: range.grain,
+          compared_to: range.previous.label,
+        },
+        financial_years: selectableFinancialYears(now),
         kpi: {
           revenue_mtd: revMTD,
           orders_mtd: ordersMTD,
           total_customers: totalCustomers || 0,
           revenue_trend: pct(revMTD, revPrev),
           orders_trend: pct(ordersMTD, ordersPrev),
-          customers_trend: pct(totalCustomers || 0, custBeforeThis || 0),
+          customers_trend: pct(totalCustomers || 0, custBeforeRange || 0),
+          average_order_value: averageOrderValue,
+          fulfilment_rate: fulfilmentRate,
+          repeat_customer_rate: repeatCustomerRate,
         },
+        farmer_distribution,
         overview: {
           products_total: productsTotal || 0,
           products_active: productsActive || 0,
@@ -147,7 +211,21 @@ exports.getDashboardStats = async (req, res, next) => {
         revenue_chart,
         revenue_daily,
       },
-    });
+    };
+ 
+    // A stakeholder sees only what an administrator granted them. The filter
+    // runs here, on the server: hiding cards in the UI while still shipping the
+    // numbers would not be a permission at all.
+    const profile = req.user?.profile;
+    if (profile?.role === 'stakeholder') {
+      return res.json({
+        success: true,
+        restricted: true,
+        data: filterDashboardForWidgets(payload.data, profile.dashboard_widgets || []),
+      });
+    }
+ 
+    res.json({ success: true, ...payload });
   } catch (err) { next(err); }
 };
 

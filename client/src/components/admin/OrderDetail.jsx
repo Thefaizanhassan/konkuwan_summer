@@ -134,7 +134,7 @@ export default function OrderDetail({ order, onClose }) {
               <tbody className="divide-y divide-border">
                 {order.items?.map(item => (
                   <tr key={item.id}>
-                    <td className="px-3 py-2">{item.Product?.name}</td>
+                    <td className="px-3 py-2">{item.Product?.name || item.product?.name || item.product_name || '—'}</td>
                     <td className="px-3 py-2 text-right">{item.quantity} {item.unit}</td>
                     <td className="px-3 py-2 text-right">₹{item.unit_price}</td>
                     <td className="px-3 py-2 text-right">

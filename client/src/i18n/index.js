@@ -2,10 +2,12 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import en from './locales/en.json';
 import or from './locales/or.json';
+import hi from './locales/hi.json';
  
 export const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'English', nativeLabel: 'English' },
   { code: 'or', label: 'Odia', nativeLabel: 'ଓଡ଼ିଆ' },
+  { code: 'hi', label: 'Hindi', nativeLabel: 'हिन्दी' },
 ];
  
 const STORAGE_KEY = 'kk_language';
@@ -31,6 +33,7 @@ i18n
     resources: {
       en: { translation: en },
       or: { translation: or },
+      hi: { translation: hi },
     },
     lng: storedLanguage(),
     fallbackLng: 'en',

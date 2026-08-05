@@ -114,7 +114,7 @@ export default function CustomerProfile() {
                   <span className="font-mono font-semibold text-forest">{inr(o.total_amount)}</span>
                 </div>
                 <p className="text-xs text-muted mt-1">
-                  {(o.items || []).map(it => `${it.product?.name || '—'} × ${Number(it.quantity)}${it.unit || ''}`).join(' · ')}
+                  {(o.items || []).map(it => `${it.product?.name || it.product_name || '—'} × ${Number(it.quantity)}${it.unit || ''}`).join(' · ')}
                 </p>
               </div>
             ))}

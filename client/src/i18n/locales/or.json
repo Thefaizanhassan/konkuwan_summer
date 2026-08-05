@@ -165,7 +165,22 @@
     "dailyRevenue": "ଦୈନିକ ରାଜସ୍ୱ",
     "backToMonths": "୧୨ ମାସକୁ ଫେରନ୍ତୁ",
     "clickMonthHint": "ଦିନ-ଅନୁସାରେ ଦେଖିବାକୁ ଏକ ମାସ ଉପରେ କ୍ଲିକ୍ କରନ୍ତୁ",
-    "noRevenueMonth": "{{month}}ରେ କୌଣସି ବିକ୍ରୟ ରେକର୍ଡ ହୋଇନାହିଁ"
+    "noRevenueMonth": "{{month}}ରେ କୌଣସି ବିକ୍ରୟ ରେକର୍ଡ ହୋଇନାହିଁ",
+    "restrictedView": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ପାଇଁ ସୀମିତ ଡ୍ୟାସବୋର୍ଡ ଦେଖାଯାଉଛି।",
+    "noWidgets": "ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ସହ ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ମେଟ୍ରିକ୍ ସେୟାର ହୋଇନାହିଁ। ପ୍ରଶାସକଙ୍କୁ ପଚାରନ୍ତୁ।",
+    "periodAnnual": "ବାର୍ଷିକ",
+    "periodQuarterly": "ତ୍ରୈମାସିକ",
+    "periodMonthly": "ମାସିକ",
+    "financialYear": "ଆର୍ଥିକ ବର୍ଷ",
+    "quarter": "ତ୍ରୈମାସ",
+    "month": "ମାସ",
+    "comparedTo": "{{label}} ତୁଳନାରେ",
+    "revenuePeriod": "ରାଜସ୍ୱ",
+    "ordersPeriod": "ଅର୍ଡର",
+    "avgOrderValue": "ହାରାହାରି ଅର୍ଡର ମୂଲ୍ୟ",
+    "fulfilmentRate": "ପୂରଣ ହାର",
+    "repeatCustomerRate": "ପୁନରାବୃତ୍ତ ଗ୍ରାହକ ହାର",
+    "farmerDistribution": "ଫସଲ ଅନୁସାରେ ଚାଷୀ"
   },
   "products": {
     "title": "ଉତ୍ପାଦ",
@@ -252,7 +267,19 @@
       "totalSpend": "ମୋଟ ଖର୍ଚ୍ଚ",
       "orderHistory": "ଅର୍ଡର ଇତିହାସ",
       "noOrders": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଅର୍ଡର ନାହିଁ।"
-    }
+    },
+    "analytics": "ଗ୍ରାହକ ବିଶ୍ଳେଷଣ",
+    "purchaseByCustomer": "ଗ୍ରାହକ ଅନୁସାରେ କ୍ରୟ ମୂଲ୍ୟ",
+    "sortBy": "ସଜାନ୍ତୁ",
+    "sortValue": "କ୍ରୟ ମୂଲ୍ୟ",
+    "sortOrders": "ଅର୍ଡର ସଂଖ୍ୟା",
+    "sortName": "ନାମ (କ–କ୍ଷ)",
+    "ordersLabel": "{{count}} ଅର୍ଡର",
+    "ordersLabel_one": "{{count}} ଅର୍ଡର",
+    "showingRange": "{{total}}ରୁ {{from}}–{{to}} ଦେଖାଯାଉଛି",
+    "noCustomerData": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି କ୍ରୟ ରେକର୍ଡ ହୋଇନାହିଁ।",
+    "hideChart": "ଚାର୍ଟ ଲୁଚାନ୍ତୁ",
+    "showChart": "ଚାର୍ଟ ଦେଖାନ୍ତୁ"
   },
   "orders": {
     "title": "ଅର୍ଡର",
@@ -284,7 +311,10 @@
       "dispatched": "ପଠାଯାଇଛି",
       "delivered": "ପହଞ୍ଚିଛି",
       "cancelled": "ବାତିଲ୍"
-    }
+    },
+    "otherProduct": "ଅନ୍ୟ (କାଟାଲଗରେ ନାହିଁ)",
+    "customProductName": "ଉତ୍ପାଦ / ଫସଲ ନାମ",
+    "customProductHint": "କେବଳ ଏହି ଅର୍ଡରରେ ବିକ୍ରି — ଉତ୍ପାଦ ତାଲିକାରେ ଯୋଡ଼ାଯାଉନାହିଁ।"
   },
   "inquiries": {
     "title": "ଅନୁସନ୍ଧାନ",
@@ -531,7 +561,8 @@
       "product_manager": "ଉତ୍ପାଦ ପରିଚାଳକ",
       "order_manager": "ଅର୍ଡର ପରିଚାଳକ",
       "farm_manager": "ଫାର୍ମ ପରିଚାଳକ",
-      "viewer": "ଦର୍ଶକ"
+      "viewer": "ଦର୍ଶକ",
+      "stakeholder": "ଅଂଶୀଦାର"
     },
     "adminUsers": "ପ୍ରଶାସକ ବ୍ୟବହାରକାରୀ",
     "alreadyInactive": "ପୂର୍ବରୁ ନିଷ୍କ୍ରିୟ",
@@ -539,7 +570,12 @@
     "inviteNew": "ନୂଆ ବ୍ୟବହାରକାରୀଙ୍କୁ ଆମନ୍ତ୍ରଣ କରନ୍ତୁ",
     "sendInvite": "ଆମନ୍ତ୍ରଣ ପଠାନ୍ତୁ",
     "saveChanges": "ପରିବର୍ତ୍ତନ ସଞ୍ଚୟ କରନ୍ତୁ",
-    "inviteFailed": "ଆମନ୍ତ୍ରଣ ପଠାଇବାରେ ବିଫଳ"
+    "inviteFailed": "ଆମନ୍ତ୍ରଣ ପଠାଇବାରେ ବିଫଳ",
+    "dashboardAccess": "ଡ୍ୟାସବୋର୍ଡ ପ୍ରବେଶ",
+    "dashboardAccessHint": "ଏହି ଅଂଶୀଦାର କେଉଁ ମେଟ୍ରିକ୍ ଦେଖିପାରିବେ ବାଛନ୍ତୁ। ବାକି ସବୁ ସର୍ଭର ଦ୍ୱାରା ଅଟକାଯାଏ।",
+    "selectAll": "ସବୁ ବାଛନ୍ତୁ",
+    "clearAll": "ସବୁ ହଟାନ୍ତୁ",
+    "widgetsGranted": "{{total}}ରୁ {{count}} ବଛା ହୋଇଛି"
   },
   "audit": {
     "title": "ଅଡିଟ୍ ଲଗ୍",
@@ -673,5 +709,27 @@
     "none": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଗୋଦାମ ନାହିଁ। ଷ୍ଟକ୍ ଗତିବିଧି ରେକର୍ଡ କରିବାକୁ ଗୋଟିଏ ଯୋଡ଼ନ୍ତୁ।",
     "saveFailed": "ଗୋଦାମ ସଞ୍ଚୟ କରାଯାଇପାରିଲା ନାହିଁ।",
     "inactiveHint": "ନିଷ୍କ୍ରିୟ ଗୋଦାମ ନୂଆ ଚାଲାନରୁ ଲୁଚାଯାଇଛି।"
+  },
+  "widgets": {
+    "revenue_period": "ରାଜସ୍ୱ (ବର୍ତ୍ତମାନ ଅବଧି)",
+    "revenue_trends": "ରାଜସ୍ୱ ଧାରା",
+    "average_order_value": "ହାରାହାରି ଅର୍ଡର ମୂଲ୍ୟ",
+    "orders_period": "ଅର୍ଡର (ବର୍ତ୍ତମାନ ଅବଧି)",
+    "order_status_mix": "ଅର୍ଡର ସ୍ଥିତି ମିଶ୍ରଣ",
+    "fulfilment_rate": "ଅର୍ଡର ପୂରଣ ହାର",
+    "customers_total": "ମୋଟ ଗ୍ରାହକ",
+    "repeat_customer_rate": "ପୁନରାବୃତ୍ତି ଗ୍ରାହକ ହାର",
+    "products_summary": "ଉତ୍ପାଦ ସାରାଂଶ",
+    "top_products": "ଶ୍ରେଷ୍ଠ ଉତ୍ପାଦ",
+    "farmers_total": "ମୋଟ ଚାଷୀ",
+    "farmer_distribution_by_crop": "ଫସଲ ଅନୁସାରେ ଚାଷୀ ବଣ୍ଟନ",
+    "cultivated_area": "ମୋଟ ଚାଷ ଜମି"
+  },
+  "widgetGroups": {
+    "revenue": "ରାଜସ୍ୱ",
+    "orders": "ଅର୍ଡର",
+    "customers": "ଗ୍ରାହକ",
+    "products": "ଉତ୍ପାଦ",
+    "farm": "ଚାଷ"
   }
 }

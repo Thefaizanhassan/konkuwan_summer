@@ -181,6 +181,62 @@ function KPICard({ label, value, trend, trendUp }) {
   );
 }
 
+const FY_MONTH_LABELS = ['April','May','June','July','August','September','October','November','December','January','February','March'];
+ 
+// Annual / Quarterly / Monthly on the Indian financial year. The server owns
+// the actual boundaries; this only chooses which period to ask for.
+function PeriodSwitcher({ value, onChange, period, financialYears, t }) {
+  const set = (patch) => onChange({ ...value, ...patch });
+  const btn = (active) => ({
+    background: active ? '#162F22' : 'rgba(22,47,34,0.06)',
+    color: active ? '#F4EFE6' : '#2a5e3a',
+  });
+  const select = 'border border-border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-forest/20';
+ 
+  return (
+    <div className="rounded-2xl p-4 mb-6 flex items-center gap-3 flex-wrap"
+      style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
+      <div className="flex rounded-lg overflow-hidden">
+        {[['year', t('dashboard.periodAnnual')], ['quarter', t('dashboard.periodQuarterly')], ['month', t('dashboard.periodMonthly')]]
+          .map(([id, label]) => (
+            <button key={id} type="button"
+              onClick={() => set({ period: id, quarter: '', month: '' })}
+              className="px-3 py-1.5 text-xs font-semibold transition"
+              style={btn(value.period === id)}>
+              {label}
+            </button>
+          ))}
+      </div>
+ 
+      <label className="text-xs" style={{ color: '#6a7a63' }}>{t('dashboard.financialYear')}</label>
+      <select className={select} value={value.fy || (period?.fy ?? '')} onChange={(e) => set({ fy: e.target.value })}>
+        {(financialYears || []).map((f) => <option key={f.fy} value={f.fy}>{f.label}</option>)}
+      </select>
+ 
+      {value.period === 'quarter' && (
+        <select className={select} value={value.quarter || (period?.quarter ?? '')} onChange={(e) => set({ quarter: e.target.value })}>
+          {[1, 2, 3, 4].map((q) => (
+            <option key={q} value={q}>{`Q${q}`}</option>
+          ))}
+        </select>
+      )}
+ 
+      {value.period === 'month' && (
+        <select className={select} value={value.month || (period?.month ?? '')} onChange={(e) => set({ month: e.target.value })}>
+          {FY_MONTH_LABELS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+        </select>
+      )}
+ 
+      {period && (
+        <span className="text-xs ml-auto" style={{ color: '#9aa694' }}>
+          <strong style={{ color: '#1c2e1f' }}>{period.label}</strong>
+          {period.compared_to ? ` · ${t('dashboard.comparedTo', { label: period.compared_to })}` : ''}
+        </span>
+      )}
+    </div>
+  );
+}
+ 
 const fmtTrend = (t) => (t == null ? null : `${t > 0 ? '+' : ''}${t}%`);
 
 // One formatter for both chart views so the axis and tooltip never disagree.
@@ -191,28 +247,45 @@ const fmtMoney = (v) => {
 
 export default function Dashboard() {
   const { t } = useTranslation();
-  // null = 12-month overview; 'YYYY-MM' = drilled into that month.
+  // null = period overview; 'YYYY-MM' = drilled into that month.
   const [drillMonth, setDrillMonth] = useState(null);
+  // Reporting period on the Indian financial year. Empty values mean "let the
+  // server pick the current FY and month".
+  const [periodSel, setPeriodSel] = useState({ period: 'month', fy: '', quarter: '', month: '' });
   const { user } = useAuth();
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: () => apiClient.get('/admin/analytics/dashboard').then(r => r.data),
+    queryKey: ['dashboard', periodSel],
+    queryFn: () => apiClient.get('/admin/analytics/dashboard', { params: periodSel }).then(r => r.data),
     staleTime: 60_000,
     // retry: false, may need to commented out
   });
 
+  const kpi = data?.data?.kpi || {};
+  const overview = data?.data?.overview || {};
+  const periodMeta = data?.data?.period;
+  const financialYears = data?.data?.financial_years || [];
+  // A stakeholder receives a filtered payload plus the list of what they were
+  // granted. Staff receive the full payload and `restricted` is absent, so
+  // `can()` returns true for everything.
+  const restricted = data?.restricted === true;
+  const granted = data?.data?.granted_widgets || [];
+  const can = (key) => !restricted || granted.includes(key);
+ 
+  // Farm Ops analytics is a separate, staff-only endpoint. Asking for it as a
+  // stakeholder just earns a 403, so don't ask.
   const { data: farmData } = useQuery({
     queryKey: ['farm-analytics'],
     queryFn: () => apiClient.get('/admin/farm/analytics').then(r => r.data.data),
     staleTime: 60_000,
     retry: false,
+    enabled: data != null && !restricted,
   });
   const expenseCats = farmData?.expense_by_category || [];
-  const farmersByCrop = farmData?.farmers_by_crop || [];
+  // The dashboard payload carries the same crop counts, and it is the only
+  // source a stakeholder has — so prefer it and fall back to Farm Ops.
+  const farmersByCrop = data?.data?.farmer_distribution || farmData?.farmers_by_crop || [];
+  const totalEnrolled = overview.farmers_total ?? farmData?.total_farmers ?? 0;
   const PALETTE = ['#162F22', '#4A7860', '#6A9E7A', '#B8844A', '#C8A84B', '#8FA98F', '#D9CDB8', '#3B5747'];
-
-  const kpi = data?.data?.kpi || {};
-  const overview = data?.data?.overview || {};
   const statusDist = data?.data?.order_status_distribution || [];
   const recentActivity = data?.data?.recent_activity || [];
   const recentOrders = data?.data?.recent_orders || [];
@@ -282,52 +355,96 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <PeriodSwitcher
+        value={periodSel}
+        onChange={(v) => { setPeriodSel(v); setDrillMonth(null); }}
+        period={periodMeta}
+        financialYears={financialYears}
+        t={t}
+      />
+ 
+      {restricted && (
+        <p className="text-xs rounded-xl p-3 mb-6" style={{ background: '#F2F7F2', color: '#24422F' }}>
+          {t('dashboard.restrictedView')}
+        </p>
+      )}
+      {restricted && granted.length === 0 && (
+        <p className="text-sm text-center py-10" style={{ color: '#9aa694' }}>{t('dashboard.noWidgets')}</p>
+      )}
+
       {/* KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-        <KPICard
-          label={t('dashboard.revenueMtd')}
+        {can('revenue_period') && <KPICard
+          label={t('dashboard.revenuePeriod')}
           value={`₹${Number(kpi.revenue_mtd || 0).toLocaleString('en-IN')}`}
           trend={fmtTrend(kpi.revenue_trend)} trendUp={(kpi.revenue_trend ?? 0) >= 0}
-        />
-        <KPICard
-          label={t('dashboard.ordersMtd')}
+        />}
+        {can('average_order_value') && kpi.average_order_value != null && <KPICard
+          label={t('dashboard.avgOrderValue')}
+          value={`₹${Number(kpi.average_order_value || 0).toLocaleString('en-IN')}`}
+        />}
+        {can('fulfilment_rate') && kpi.fulfilment_rate != null && <KPICard
+          label={t('dashboard.fulfilmentRate')}
+          value={`${kpi.fulfilment_rate}%`}
+        />}
+        {can('orders_period') && <KPICard
+          label={t('dashboard.ordersPeriod')}
           value={kpi.orders_mtd ?? 0}
           trend={fmtTrend(kpi.orders_trend)} trendUp={(kpi.orders_trend ?? 0) >= 0}
-        />
-        <KPICard
+        />}
+        {can('customers_total') && <KPICard
           label={t('dashboard.totalCustomers')}
           value={kpi.total_customers ?? 0}
           trend={fmtTrend(kpi.customers_trend)} trendUp={(kpi.customers_trend ?? 0) >= 0}
-        />
+        />}
+        {can('repeat_customer_rate') && kpi.repeat_customer_rate != null && <KPICard
+          label={t('dashboard.repeatCustomerRate')}
+          value={`${kpi.repeat_customer_rate}%`}
+        />}
       </div>
 
-      {/* Operational overview */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        {[
-          { label: t('dashboard.productsCard'), value: `${overview.products_active ?? 0}/${overview.products_total ?? 0}`, sub: t('dashboard.productsSub'), to: '/admin/products' },
+      {/* Operational overview. `widget` names the permission a stakeholder needs;
+          cards without one are operational and staff-only. Gating card by card
+          rather than hiding the whole strip is what makes a grant like
+          "Products summary" actually show something. */}
+      {(() => {
+        const cards = [
+          { widget: 'products_summary', label: t('dashboard.productsCard'), value: `${overview.products_active ?? 0}/${overview.products_total ?? 0}`, sub: t('dashboard.productsSub'), to: '/admin/products' },
           { label: t('dashboard.potentialLeads'), value: overview.potential_leads ?? 0, sub: t('dashboard.potentialLeadsSub'), to: '/admin/customers' },
           { label: t('dashboard.newInquiries'), value: overview.inquiries_new ?? 0, sub: t('dashboard.inquiriesSub', { count: overview.inquiries_total ?? 0 }), to: '/admin/inquiries', alert: (overview.inquiries_new ?? 0) > 0 },
-          { label: t('dashboard.farmers'), value: overview.farmers_total ?? 0, sub: t('dashboard.farmersSub', { count: Number(overview.farm_area_decimal || 0).toFixed(0) }), to: '/admin/farm' },
-          { label: t('dashboard.cultivated'), value: `${Number(overview.cultivated_acres || 0)} ac`, sub: t('dashboard.cultivatedSub', { count: overview.crops_tracked ?? 0 }), to: '/admin/farm' },
+          { widget: 'farmers_total', label: t('dashboard.farmers'), value: overview.farmers_total ?? 0, sub: t('dashboard.farmersSub', { count: Number(overview.farm_area_decimal || 0).toFixed(0) }), to: '/admin/farm' },
+          { widget: 'cultivated_area', label: t('dashboard.cultivated'), value: `${Number(overview.cultivated_acres || 0)} ac`, sub: t('dashboard.cultivatedSub', { count: overview.crops_tracked ?? 0 }), to: '/admin/farm' },
           { label: t('dashboard.farmExpenses'), value: `₹${Number(overview.expenses_mtd || 0).toLocaleString('en-IN')}`, sub: t('dashboard.farmExpensesSub', { amount: `₹${Number(overview.farm_revenue_logged_mtd || 0).toLocaleString('en-IN')}` }), to: '/admin/farm' },
-        ].map(card => (
-          <Link key={card.label} to={card.to}
-            className="rounded-2xl p-4 block hover:shadow-md transition"
-            style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)', border: card.alert ? '1px solid #f3d9a4' : '1px solid rgba(0,0,0,0.02)' }}
-          >
-            <p className="text-xs font-medium" style={{ color: '#6a7a63' }}>{card.label}</p>
-            <p className="text-xl font-bold mt-1" style={{ color: card.alert ? '#92400e' : '#1c2e1f' }}>{card.value}</p>
-            <p className="text-[11px] mt-0.5" style={{ color: '#9aa694' }}>{card.sub}</p>
-          </Link>
-        ))}
-      </div>
+        ].filter(c => (restricted ? c.widget && can(c.widget) : true));
+        if (cards.length === 0) return null;
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            {cards.map(card => {
+              const body = (
+                <>
+                  <p className="text-xs font-medium" style={{ color: '#6a7a63' }}>{card.label}</p>
+                  <p className="text-xl font-bold mt-1" style={{ color: card.alert ? '#92400e' : '#1c2e1f' }}>{card.value}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: '#9aa694' }}>{card.sub}</p>
+                </>
+              );
+              const style = { background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)', border: card.alert ? '1px solid #f3d9a4' : '1px solid rgba(0,0,0,0.02)' };
+              // A stakeholder has no page to navigate to, so the card is static.
+              return restricted
+                ? <div key={card.label} className="rounded-2xl p-4" style={style}>{body}</div>
+                : <Link key={card.label} to={card.to} className="rounded-2xl p-4 block hover:shadow-md transition" style={style}>{body}</Link>;
+            })}
+          </div>
+        );
+      })()}
  
+      {!restricted && (<>
       {/* Needs attention */}
       <NeedsAttention overview={overview} t={t} />
+      </>)}
 
       {/* Chart + Top Products */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-7 mb-8">
-        {/* Chart */}
+        {can('revenue_trends') && (<>{/* Chart */}
         <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3 min-w-0">
@@ -401,7 +518,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Top Products */}
+        </>)}
+        {can('top_products') && (<>{/* Top Products */}
         <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
           <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>{t('dashboard.topProducts')}</h3>
           {topProducts.length === 0 ? (
@@ -423,12 +541,19 @@ export default function Dashboard() {
               ))}
             </ul>
           )}
-        </div>
+        </div></>)}
       </div>
 
-      {/* Operations analytics */}
-      {(expenseCats.length > 0 || farmersByCrop.length > 0) && (
+      {/* Operations analytics. Expenses are staff-only — a stakeholder never
+          sees individual spend — but the crop distribution is grantable, so the
+          two cards are gated separately rather than as one block. */}
+      {(() => {
+        const showExpenses = !restricted && expenseCats.length > 0;
+        const showCrops = can('farmer_distribution_by_crop') && farmersByCrop.length > 0;
+        if (!showExpenses && !showCrops) return null;
+        return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 mb-8">
+          {showExpenses && (
           <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
             <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>{t('dashboard.expensesByCategory')}</h3>
             {expenseCats.length === 0 ? (
@@ -465,10 +590,12 @@ export default function Dashboard() {
               </>
             )}
           </div>
+          )}
 
+          {showCrops && (
           <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
             <h3 className="font-display text-xl mb-1" style={{ color: '#1c2e1f' }}>{t('dashboard.farmersByCrop')}</h3>
-            <p className="text-xs mb-4" style={{ color: '#7b8a76' }}>{t('dashboard.totalEnrolled', { count: farmData?.total_farmers ?? 0 })}</p>
+            <p className="text-xs mb-4" style={{ color: '#7b8a76' }}>{t('dashboard.totalEnrolled', { count: totalEnrolled })}</p>
             {farmersByCrop.length === 0 ? (
               <p className="text-sm text-muted text-center py-8">{t('dashboard.noFarmers')}</p>
             ) : (
@@ -485,11 +612,15 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+          )}
         </div>
-      )}
+        );
+      })()}
 
-      {/* Order pipeline + Recent activity */}
+      {/* Order pipeline + Recent activity. The pipeline is grantable; the audit
+          trail is not — staff activity is never a stakeholder's business. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 mb-8">
+        {can('order_status_mix') && (
         <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
           <h3 className="font-display text-xl mb-4" style={{ color: '#1c2e1f' }}>{t('dashboard.orderPipeline')}</h3>
           {statusDist.length === 0 ? (
@@ -510,7 +641,9 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        )}
  
+        {!restricted && (
         <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-display text-xl" style={{ color: '#1c2e1f' }}>{t('dashboard.recentActivity')}</h3>
@@ -541,8 +674,10 @@ export default function Dashboard() {
             </ul>
           )}
         </div>
+        )}
       </div>
  
+      {!restricted && (<>
       {/* Recent Orders */}
       <div className="rounded-2xl p-6" style={{ background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.03)' }}>
         <div className="flex items-center justify-between mb-5">
@@ -589,6 +724,7 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+      </>)}
     </div>
   );
 }

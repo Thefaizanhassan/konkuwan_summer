@@ -2,13 +2,20 @@ const Joi = require('joi');
 
 const CHALLAN_TYPES = ['farmer_to_warehouse', 'warehouse_transfer'];
 
+// `.empty(Joi.valid('', null))` collapses blanks to undefined before `.or()`
+// looks at them — `.or()` only tests key presence, so without it a line with an
+// empty name would pass validation and reach the database with no product.
 const challanItemSchema = Joi.object({
-  product_id: Joi.string().uuid().optional().allow(null, ''),
-  product_name: Joi.string().max(200).optional().allow('', null),
+  product_id: Joi.string().uuid().empty(Joi.valid('', null)).optional(),
+  product_name: Joi.string().trim().empty(Joi.valid('', null)).max(200).optional(),
   quantity: Joi.number().positive().required(),
   unit: Joi.string().max(50).default('kg'),
   purchase_rate: Joi.number().min(0).required(),
-}).or('product_id', 'product_name');
+})
+  .or('product_id', 'product_name')
+  // Without its own message this inherits the farmer message from the
+  // conditional below, which reads as nonsense on a line item.
+  .messages({ 'object.missing': 'Each line needs a product, or a name if you chose Other.' });
  
 // Two workflows share one table, so the required fields differ by type:
 //
@@ -24,16 +31,18 @@ const createChallanSchema = Joi.object({
   challan_type: Joi.string().valid(...CHALLAN_TYPES).default('farmer_to_warehouse'),
   challan_date: Joi.date().iso().optional(),
  
-  // Procurement
-  farmer_id: Joi.string().uuid().optional().allow(null, ''),
+  // Procurement. Blanks collapse to undefined for the same reason as above:
+  // the `.or('farmer_id', 'farmer_name')` below must not be satisfied by a
+  // field the user left empty.
+  farmer_id: Joi.string().uuid().empty(Joi.valid('', null)).optional(),
   // farmer_name alone is deliberately valid: "Other" records a supplier
   // without creating a permanent farmer record.
-  farmer_name: Joi.string().max(120).optional().allow('', null),
-  farmer_address: Joi.string().max(500).optional().allow('', null),
+  farmer_name: Joi.string().trim().empty(Joi.valid('', null)).max(120).optional(),
+  farmer_address: Joi.string().trim().empty(Joi.valid('', null)).max(500).optional(),
  
   // Warehouses
-  source_warehouse_id: Joi.string().uuid().optional().allow(null, ''),
-  destination_warehouse_id: Joi.string().uuid().optional().allow(null, ''),
+  source_warehouse_id: Joi.string().uuid().empty(Joi.valid('', null)).optional(),
+  destination_warehouse_id: Joi.string().uuid().empty(Joi.valid('', null)).optional(),
 
   challan_charges: Joi.number().min(0).default(0),
   notes: Joi.string().optional().allow('', null),
