@@ -41,7 +41,16 @@ const errorHandler = require('./middlewares/errorHandler');
 const app = express();
 
 // ── Security headers ──
-app.use(helmet());
+// These land on `/api/*` responses only. On Workers, `run_worker_first` routes
+// just the API through Express — the SPA is served by Static Assets and never
+// reaches this middleware, so the headers protecting the *page* are generated
+// into client/dist/_headers at build time (see client/vite-plugin-headers.js).
+// Keep the two in step.
+//
+// CSP is off here on purpose: a JSON response has no scripts, styles or frames
+// to restrict, and a second policy on this path would only be one more thing to
+// keep aligned with the real one.
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // ── CORS ──
 // Not needed: the SPA and this API are served from the same Worker origin.
@@ -108,6 +117,85 @@ app.use('/api/admin/categories', categoryAdminRoutes);
 app.use('/api/contact', contactPublicRoutes);
 app.use('/api/admin/contact', contactAdminRoutes);
 // app.use('/api/products', require('./routes/product.routes'));
+
+// ── Single-page app ──
+//
+// Only used when running as a container or a plain Node process. On Cloudflare
+// the SPA is served by Workers Static Assets and never reaches Express, which
+// is why this is guarded on the directory existing rather than on NODE_ENV:
+// the bundle has no __dirname and no client/dist, so it is skipped there.
+//
+// Registered after every /api route so an unknown API path still 404s as JSON
+// instead of being answered with index.html.
+if (typeof __dirname !== 'undefined') {
+  const fs = require('fs');
+  const path = require('path');
+  const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
+  if (fs.existsSync(path.join(clientDist, 'index.html'))) {
+    // The document headers. client/dist/_headers carries these on Cloudflare,
+    // but that file is consumed by Static Assets and means nothing to Express —
+    // so a container would otherwise serve the SPA with no CSP at all. Same
+    // policy, applied by whichever runtime is actually serving the page.
+    const supabaseOrigin = (() => {
+      try { return new URL(process.env.SUPABASE_URL).origin; } catch { return ''; }
+    })();
+    const csp = [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "script-src-attr 'none'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      `img-src 'self' data: blob: ${supabaseOrigin}`.trim(),
+      `connect-src 'self' ${supabaseOrigin}`.trim(),
+    ].join('; ');
+ 
+    const documentHeaders = (res) => {
+      res.setHeader('Content-Security-Policy', csp);
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(), usb=()');
+    };
+ 
+    // _headers and _redirects are Cloudflare deployment metadata. Static Assets
+    // consumes them and never serves them; express.static would hand them out
+    // as files, so exclude them explicitly (dotfiles:'ignore' does not apply —
+    // they start with an underscore, not a dot).
+    app.use(['/_headers', '/_redirects'], (req, res) => res.status(404).end());
+ 
+    app.use(express.static(clientDist, {
+      // index.html is served by the catch-all below, which sets the document
+      // headers; letting static serve it too would bypass them.
+      index: false,
+      dotfiles: 'ignore',
+      setHeaders: (res, filePath) => {
+        // Hashed filenames are content-addressed, so they can be cached hard.
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    }));
+ 
+    // Client-side routing: any non-API path renders the app.
+    //
+    // /assets/ is excluded on purpose. Answering a missing bundle with
+    // index.html returns HTML under a .js content type, which the browser
+    // rejects with a confusing MIME error and which hides the real problem —
+    // a stale index.html pointing at a hash that is no longer deployed.
+    app.get(/^(?!\/(api|assets)\/).*/, (req, res) => {
+      documentHeaders(res);
+      res.setHeader('Cache-Control', 'no-cache');
+      res.sendFile(path.join(clientDist, 'index.html'));
+    });
+ 
+    logger.info('Serving the SPA from client/dist');
+  }
+}
 
 // ── Catch-all 404 ──
 app.use(notFound);

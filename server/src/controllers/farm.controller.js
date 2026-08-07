@@ -4,6 +4,7 @@ const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
 const { createFarmerSchema } = require('../validations/farmer.validation');
 const { BILLABLE_ORDER_STATUSES } = require('../utils/orderStatus');
+const { orFilter, likeTerm, quoteValue } = require('../utils/pgrst');
 
 // const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 // ── AI provider (switchable: Claude / OpenAI) ────────────────────────────
@@ -240,7 +241,13 @@ exports.importFarmers = async (req, res, next) => {
       // Duplicate = same name in the same village (or same phone)
       let dupQuery = supabase.from('farmers').select('id');
       if (value.phone) {
-        dupQuery = dupQuery.or(`phone.eq.${value.phone},and(name.ilike.${value.name},village.ilike.${value.village || ''})`);
+        // Name and village are free text from a CSV, so they are matched as
+        // quoted literals rather than spliced into the filter grammar.
+        dupQuery = dupQuery.or(
+          `${orFilter([['phone', 'eq', quoteValue(value.phone)]])},` +
+          `and(${orFilter([['name', 'ilike', likeTerm(value.name)]])},` +
+          `${orFilter([['village', 'ilike', likeTerm(value.village || '')]])})`
+        );
       } else {
         dupQuery = dupQuery.ilike('name', value.name).ilike('village', value.village || '');
       }

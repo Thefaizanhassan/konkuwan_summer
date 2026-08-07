@@ -47,7 +47,8 @@
     "none": "—",
     "confirmDelete": "Are you sure you want to delete this?",
     "somethingWentWrong": "Something went wrong. Please try again.",
-    "dragToReorder": "Drag to reorder"
+    "dragToReorder": "Drag to reorder",
+    "clearFilters": "Clear filters"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -132,8 +133,10 @@
     "attentionInquiries": "{{count}} new inquiries waiting for a reply",
     "attentionDrafts": "{{count}} draft orders not yet confirmed",
     "attentionVisits": "{{count}} farmers not visited in 2+ weeks",
-    "revenue12": "Revenue Last 12 Months",
+    "revenueTrend": "Revenue Trend",
     "monthlyRevenue": "Monthly revenue",
+    "asOf": "as of {{date}}",
+    "partialPeriod": "Period still in progress — figures run to {{date}}.",
     "noRevenue": "No revenue data yet",
     "topProducts": "Top Products",
     "noSales": "No sales data yet",
@@ -586,7 +589,12 @@
     "action": "Action",
     "entity": "Entity",
     "details": "Details",
-    "noLogs": "No logs found."
+    "noLogs": "No logs found.",
+    "fromDate": "From date",
+    "toDate": "To date",
+    "nothingToExport": "No logs match these filters.",
+    "exportFailed": "Export failed.",
+    "exportTruncated": "Exported the most recent {{count}} of {{total}} matching logs. Narrow the date range for the rest."
   },
   "settings": {
     "title": "System Settings",

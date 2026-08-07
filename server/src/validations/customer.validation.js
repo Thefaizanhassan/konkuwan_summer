@@ -9,7 +9,10 @@ const createCustomerSchema = Joi.object({
   gstin: Joi.string().max(30).optional().allow('', null),
   notes: Joi.string().optional().allow('', null),
   lead_status: Joi.string().valid('active_customer', 'potential_lead').default('active_customer'),
-  linkedin_url: Joi.string().uri().max(500).optional().allow('', null),
+  // scheme:[] matters — a bare .uri() accepts javascript: and the value is
+  // rendered as an href on the customer profile.
+  linkedin_url: Joi.string().uri({ scheme: ['http', 'https'] }).max(500).optional().allow('', null)
+    .messages({ 'string.uriCustomScheme': 'LinkedIn URL must start with http:// or https://.' }),
 });
 
 const updateCustomerSchema = createCustomerSchema.fork(

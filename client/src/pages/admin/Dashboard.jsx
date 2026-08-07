@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import apiClient from '../../services/api';
+import { revenueSeries } from '../../lib/revenueSeries';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -228,8 +229,14 @@ function PeriodSwitcher({ value, onChange, period, financialYears, t }) {
       )}
  
       {period && (
-        <span className="text-xs ml-auto" style={{ color: '#9aa694' }}>
+        <span className="text-xs ml-auto text-right" style={{ color: '#9aa694' }}>
           <strong style={{ color: '#1c2e1f' }}>{period.label}</strong>
+          {/* A period that has not finished is reported only to today, and the
+              baseline is trimmed to the same span. Say so, or a part-year
+              figure reads as a whole-year one. */}
+          {period.partial && period.as_of && (
+            <> · {t('dashboard.asOf', { date: new Date(period.as_of).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) })}</>
+          )}
           {period.compared_to ? ` · ${t('dashboard.comparedTo', { label: period.compared_to })}` : ''}
         </span>
       )}
@@ -253,6 +260,10 @@ export default function Dashboard() {
   // server pick the current FY and month".
   const [periodSel, setPeriodSel] = useState({ period: 'month', fy: '', quarter: '', month: '' });
   const { user } = useAuth();
+  // A drill-down belongs to the period it was opened from. Without this, moving
+  // from FY2026 to FY2025 kept showing "August 2026" with no data behind it.
+  useEffect(() => { setDrillMonth(null); }, [periodSel]);
+
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', periodSel],
     queryFn: () => apiClient.get('/admin/analytics/dashboard', { params: periodSel }).then(r => r.data),
@@ -262,7 +273,6 @@ export default function Dashboard() {
 
   const kpi = data?.data?.kpi || {};
   const overview = data?.data?.overview || {};
-  const periodMeta = data?.data?.period;
   const financialYears = data?.data?.financial_years || [];
   // A stakeholder receives a filtered payload plus the list of what they were
   // granted. Staff receive the full payload and `restricted` is absent, so
@@ -289,33 +299,20 @@ export default function Dashboard() {
   const statusDist = data?.data?.order_status_distribution || [];
   const recentActivity = data?.data?.recent_activity || [];
   const recentOrders = data?.data?.recent_orders || [];
+  const periodMeta = data?.data?.period;
   const topProducts = data?.data?.top_products || [];
-  // Monthly series. `key` is the YYYY-MM used to drill down; `label` is what
-  // the axis shows. Revenue stays in rupees and is formatted at render time,
-  // so the monthly and daily views share one scale and one tooltip format.
-  const revenueChart = (data?.data?.revenue_chart || []).map(d => ({
-    key: String(d.month).slice(0, 7),
-    label: new Date(d.month).toLocaleString('default', { month: 'short' }),
-    revenue: Number(d.revenue) || 0,
-  }));
-  const revenueDaily = data?.data?.revenue_daily || [];
  
-  // Every day of the drilled-in month, including days with no sales, so a
-  // quiet month still renders a full axis instead of a single floating point.
-  const dailyChart = (() => {
-    if (!drillMonth) return [];
-    const [y, m] = drillMonth.split('-').map(Number);
-    const byDate = Object.fromEntries(revenueDaily.map(d => [d.date, Number(d.revenue) || 0]));
-    return Array.from({ length: new Date(y, m, 0).getDate() }, (_, i) => {
-      const date = `${drillMonth}-${String(i + 1).padStart(2, '0')}`;
-      return { key: date, label: String(i + 1), revenue: byDate[date] || 0 };
-    });
-  })();
+  // Which series the chart shows, and whether a month can be opened. The rule
+  // lives in lib/revenueSeries.js so it can be tested on its own — see the
+  // comment there for why the drill-down used to do nothing.
+  const {
+    canDrill, isDayView, isDrilled, shownMonth,
+    months: revenueChart, data: chartData, xTickInterval,
+  } = useMemo(() => revenueSeries(data?.data, drillMonth), [data, drillMonth]);
  
-  const isDrilled = Boolean(drillMonth);
-  const chartData = isDrilled ? dailyChart : revenueChart;
-  const drillMonthLabel = drillMonth
-    ? new Date(`${drillMonth}-01`).toLocaleString('default', { month: 'long', year: 'numeric' })
+  const dailyChart = isDayView ? chartData : [];
+  const drillMonthLabel = shownMonth
+    ? new Date(`${shownMonth}-01`).toLocaleString('default', { month: 'long', year: 'numeric' })
     : '';
   const monthHasSales = dailyChart.some(d => d.revenue > 0);
 
@@ -449,12 +446,13 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3 min-w-0">
               <h3 className="font-display text-xl truncate" style={{ color: '#1c2e1f' }}>
-                {isDrilled ? drillMonthLabel : t('dashboard.revenue12')}
+                {isDayView ? drillMonthLabel : t('dashboard.revenueTrend')}
               </h3>
               {isDrilled && (
                 <button
                   type="button"
                   onClick={() => setDrillMonth(null)}
+                  aria-label={t('dashboard.backToMonths')}
                   className="text-xs font-semibold px-2.5 py-1 rounded-full transition hover:opacity-80 flex-shrink-0"
                   style={{ background: 'rgba(22,47,34,0.06)', color: '#2a5e3a' }}
                 >
@@ -463,8 +461,8 @@ export default function Dashboard() {
               )}
             </div>
             <div className="flex items-center gap-2 text-xs flex-shrink-0" style={{ color: '#5f7059' }}>
-              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#2a5e3a' }} />
-              {isDrilled ? t('dashboard.dailyRevenue') : t('dashboard.monthlyRevenue')}
+              <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#1f4a2a' }} />
+              {isDayView ? t('dashboard.dailyRevenue') : t('dashboard.monthlyRevenue')}
             </div>
           </div>
           <div style={{ height: 220 }}>
@@ -472,32 +470,62 @@ export default function Dashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={chartData}
-                  margin={{ top: 4, right: 4, bottom: 0, left: -10 }}
+                  margin={{ top: 8, right: 10, bottom: 0, left: -6 }}
                   // Clicking a month swaps in that month's daily series. The
-                  // data is already loaded, so this makes no extra request.
+                  // days are already in the payload, so this makes no request.
                   onClick={(e) => {
-                    if (isDrilled) return;
+                    if (!canDrill || isDrilled) return;
                     const key = e?.activePayload?.[0]?.payload?.key;
                     if (key) setDrillMonth(key);
                   }}
-                  style={{ cursor: isDrilled ? 'default' : 'pointer' }}
+                  style={{ cursor: canDrill && !isDrilled ? 'pointer' : 'default' }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false}
-                    interval={isDrilled ? 2 : 0} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }} axisLine={false} tickLine={false} tickFormatter={fmtMoney} />
+                  <defs>
+                    <linearGradient id="revLine" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2a6b3a" />
+                      <stop offset="100%" stopColor="#1f4a2a" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }}
+                    axisLine={false} tickLine={false}
+                    // 31 day-ticks will not fit on a phone; up to 12 months always do.
+                    interval={xTickInterval}
+                    minTickGap={4}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#6f7a6a', fontFamily: 'DM Sans' }}
+                    axisLine={false} tickLine={false}
+                    tickFormatter={fmtMoney}
+                    width={54}
+                    // A flat-zero month otherwise renders an axis of 0,0,0,0.
+                    allowDecimals={false}
+                  />
                   <Tooltip
-                    contentStyle={{ background: '#1c2e1f', border: 'none', borderRadius: 8, color: '#f4efe6', fontSize: 12 }}
-                    labelFormatter={(label) => (isDrilled ? `${label} ${drillMonthLabel}` : label)}
-                    formatter={(v) => [fmtMoney(v), t('dashboard.monthlyRevenue')]}
+                    cursor={{ stroke: 'rgba(31,74,42,0.25)', strokeWidth: 1 }}
+                    contentStyle={{ background: '#1c2e1f', border: 'none', borderRadius: 8, color: '#f4efe6', fontSize: 12, padding: '8px 12px' }}
+                    labelStyle={{ color: '#cfe0d2', marginBottom: 2 }}
+                    labelFormatter={(label) => (isDayView ? `${label} ${drillMonthLabel}` : label)}
+                    // The axis is abbreviated for space; the tooltip is the
+                    // place to read the actual figure, so it is not.
+                    formatter={(v) => [
+                      `₹${Number(v || 0).toLocaleString('en-IN')}`,
+                      isDayView ? t('dashboard.dailyRevenue') : t('dashboard.monthlyRevenue'),
+                    ]}
                   />
                   <Line
                     type="monotone"
                     dataKey="revenue"
-                    stroke="#1f4a2a"
-                    strokeWidth={4}
-                    dot={isDrilled ? false : { fill: '#1f4a2a', strokeWidth: 2, stroke: '#fff', r: 5 }}
-                    activeDot={{ r: 7, strokeWidth: 2, stroke: '#fff' }}
+                    stroke="url(#revLine)"
+                    strokeWidth={3.5}
+                    // A dot per day is noise at 31 points; a dot per month is a
+                    // click target and has to be visible.
+                    dot={isDayView ? false : { fill: '#1f4a2a', strokeWidth: 2, stroke: '#fff', r: 5 }}
+                    activeDot={{ r: 7, strokeWidth: 2, stroke: '#fff', fill: '#1f4a2a' }}
+                    isAnimationActive
+                    animationDuration={420}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -511,7 +539,7 @@ export default function Dashboard() {
               {t('dashboard.noRevenueMonth', { month: drillMonthLabel })}
             </p>
           )}
-          {!isDrilled && revenueChart.length > 0 && (
+          {canDrill && !isDrilled && revenueChart.length > 1 && (
             <p className="text-xs text-center mt-2" style={{ color: '#9aa694' }}>
               {t('dashboard.clickMonthHint')}
             </p>
@@ -728,79 +756,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-/*
-import { useQuery } from '@tanstack/react-query';
-import apiClient from '../../services/api';
-import KPICard from '../../components/admin/KPICard';
-import StatusBadge from '../../components/ui/StatusBadge';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-export default function Dashboard() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: () => apiClient.get('/admin/analytics/dashboard').then(res => res.data),
-  });
-
-  if (isLoading) return <div>Loading dashboard...</div>;
-
-  const { kpi, recent_orders, top_products, revenue_chart } = data.data;
-
-  return (
-    <div>
-      <h2 className="font-display text-3xl text-forest mb-8">Dashboard</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <KPICard title={t('dashboard.revenueMtd')} value={`₹${kpi.revenue_mtd.toLocaleString()}`} />
-        <KPICard title={t('dashboard.ordersMtd')} value={kpi.orders_mtd} />
-        <KPICard title={t('dashboard.totalCustomers')} value={kpi.total_customers} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-white p-6 rounded-sm border border-border">
-          <h3 className="font-display text-xl text-forest mb-4">Revenue Last 12 Months</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={revenue_chart}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" tickFormatter={(d) => new Date(d).toLocaleString('default', { month: 'short', year: '2-digit' })} />
-              <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey="revenue" stroke="#4A7860" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-white p-6 rounded-sm border border-border">
-          <h3 className="font-display text-xl text-forest mb-4">Top Products (MTD)</h3>
-          <ul className="space-y-2">
-            {top_products?.map(p => (
-              <li key={p.product_id} className="flex justify-between text-sm">
-                <span>{p.Product?.name}</span>
-                <span className="text-sage">{p.total_quantity} {p.Product?.unit}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-sm border border-border">
-        <h3 className="font-display text-xl text-forest mb-4">Recent Orders</h3>
-        <table className="w-full text-sm">
-          <thead className="text-left text-muted">
-            <tr><th>Customer</th><th>Status</th><th>Total</th><th>Date</th></tr>
-          </thead>
-          <tbody>
-            {recent_orders?.map(order => (
-              <tr key={order.id} className="border-t">
-                <td className="py-2">{order.Customer?.company_name}</td>
-                <td><StatusBadge status={order.status} /></td>
-                <td>₹{order.total_amount}</td>
-                <td>{new Date(order.order_date).toLocaleDateString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-*/

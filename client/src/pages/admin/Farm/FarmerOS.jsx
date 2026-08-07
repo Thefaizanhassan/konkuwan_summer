@@ -6,6 +6,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Modal from '../../../components/ui/Modal';
 import Papa from 'papaparse';
+import { downloadCsv, stamp } from '../../../lib/csv';
 
 // Emoji + colour are cosmetic — derived from the product name.
 const cropEmoji = (name = '') => {
@@ -107,17 +108,15 @@ export default function FarmerOS() {
       const { data: res } = await apiClient.get('/admin/farm/farmers/export');
       const rows = res.data || [];
       if (!rows.length) return alert(t('farm.farmers.nothingToExport'));
-      const csv = Papa.unparse(rows.map(r => ({
-        ...r,
-        created_at: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : '',
-      })));
-      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `konkuwan-farmers-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // downloadCsv neutralises cells that would be read as formulas — a
+      // company name saved as =HYPERLINK(...) otherwise runs on open.
+      downloadCsv(
+        rows.map(r => ({
+          ...r,
+          created_at: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : '',
+        })),
+        `konkuwan-farmers-${stamp()}`
+      );
     } catch (err) {
       alert(err?.response?.data?.message || t('farm.farmers.exportFailed'));
     } finally {

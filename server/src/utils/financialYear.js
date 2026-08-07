@@ -71,6 +71,57 @@ function quarterOf(date = new Date()) {
  
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
  
+const parseYmd = (s) => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+const fromMs = (ms) => { const d = new Date(ms); return ymd(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); };
+ 
+/**
+ * Trim a period so it never reports beyond today, and trim its comparison
+ * baseline to the same number of days.
+ *
+ * Two things were wrong without this. Reporting: on 6 August the annual view
+ * queried through 31 March next year, so the chart drew eight empty future
+ * months. Comparison: five months of this year were being measured against
+ * twelve months of last year, which made every annual trend arrow meaningless.
+ *
+ * A period entirely in the past is left alone. A period entirely in the future
+ * yields an empty range (end before start), so every figure is zero rather than
+ * inventing data.
+ */
+function clampToToday(range, now) {
+  const todayStr = ymd(now.getFullYear(), now.getMonth(), now.getDate());
+  const today = parseYmd(todayStr);
+  const start = parseYmd(range.start);
+  const end = parseYmd(range.end);
+ 
+  if (end <= today) return { ...range, partial: false };          // wholly in the past
+  if (start > today) {
+    // Future period: keep the labels, report nothing. The end must fall BEFORE
+    // the start — `end: range.start` would still match anything dated exactly
+    // on the first day.
+    return {
+      ...range,
+      end: fromMs(start - 86400000),
+      empty: true, partial: true, as_of: todayStr, full_end: range.end,
+    };
+  }
+ 
+  // Match the baseline to the elapsed span so the two windows are comparable.
+  const elapsedMs = today - start;
+  const prevStart = parseYmd(range.previous.start);
+ 
+  return {
+    ...range,
+    end: todayStr,
+    partial: true,
+    as_of: todayStr,
+    full_end: range.end,
+    previous: {
+      ...range.previous,
+      end: fromMs(Math.min(prevStart + elapsedMs, parseYmd(range.previous.end))),
+    },
+  };
+}
+
 /**
  * Resolve a requested period into concrete bounds plus the equivalent previous
  * period, which is what the trend arrows compare against. Comparing a quarter
@@ -87,13 +138,13 @@ function resolvePeriod(q = {}, now = new Date()) {
   if (period === 'year') {
     const { start, end } = fyBounds(fy);
     const prev = fyBounds(fy - 1);
-    return {
+    return clampToToday({
       period, fy, quarter: null, month: null,
       label: `FY ${fyLabel(fy)}`,
       start, end,
       previous: { ...prev, label: `FY ${fyLabel(fy - 1)}` },
       grain: 'month', // an annual chart is plotted month by month
-    };
+    }, now);
   }
  
   if (period === 'quarter') {
@@ -104,13 +155,13 @@ function resolvePeriod(q = {}, now = new Date()) {
     const prevFy = quarter === 1 ? fy - 1 : fy;
     const prevQ = quarter === 1 ? 4 : quarter - 1;
     const prev = quarterBounds(prevFy, prevQ);
-    return {
+    return clampToToday({
       period, fy, quarter, month: null,
       label: `Q${quarter} FY ${fyLabel(fy)}`,
       start, end,
       previous: { ...prev, label: `Q${prevQ} FY ${fyLabel(prevFy)}` },
       grain: 'month',
-    };
+    }, now);
   }
  
   const raw = Number(q.month);
@@ -122,7 +173,7 @@ function resolvePeriod(q = {}, now = new Date()) {
   const prevFyMonth = fyMonth === 1 ? 12 : fyMonth - 1;
   const prevFy = fyMonth === 1 ? fy - 1 : fy;
   const prevB = fyMonthBounds(prevFy, prevFyMonth);
-  return {
+  return clampToToday({
     period, fy, quarter: null, month: fyMonth,
     label: `${MONTH_NAMES[b.month]} ${b.year}`,
     start: b.start, end: b.end,
@@ -131,7 +182,7 @@ function resolvePeriod(q = {}, now = new Date()) {
       label: `${MONTH_NAMES[prevB.month]} ${prevB.year}`,
     },
     grain: 'day', // a single month is plotted day by day
-  };
+  }, now);
 }
  
 /** Financial years to offer in the picker: this one and the few before it. */
@@ -155,4 +206,5 @@ module.exports = {
   quarterOf,
   resolvePeriod,
   selectableFinancialYears,
+  clampToToday,
 };

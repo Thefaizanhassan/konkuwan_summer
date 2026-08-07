@@ -1,0 +1,50 @@
+# Production-like local run.
+#
+# There is no database service: Supabase is a managed service reached over
+# HTTPS, so the container needs credentials, not a linked Postgres. That is the
+# same shape as the Cloudflare deployment, which is the point of running this.
+#
+#   cp .env.docker.example .env
+#   docker compose up --build
+#   open http://localhost:8080
+ 
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Compiled into the bundle at build time. Changing these requires a
+        # rebuild, not a restart — they are not runtime values.
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:?set VITE_SUPABASE_URL in .env}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:?set VITE_SUPABASE_ANON_KEY in .env}
+        VITE_API_URL: /api
+    image: konkuwan-herbs:latest
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      # Runtime secrets. The service-role key bypasses RLS and must never be
+      # given to the browser or passed as a build argument.
+      SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in .env}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?set SUPABASE_SERVICE_ROLE_KEY in .env}
+      SUPABASE_IMAGE_BUCKET: ${SUPABASE_IMAGE_BUCKET:-product-images}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-5242880}
+      # Optional — only the Farm Ops AI features need these.
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    restart: unless-stopped
+    # Compose waits on this before reporting the service healthy.
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8080/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    # No volumes: uploads go to Supabase Storage and logs go to stdout, so the
+    # container holds no state worth persisting. Nothing to mount, nothing to
+    # lose on redeploy.
+    security_opt:
+      - no-new-privileges:true

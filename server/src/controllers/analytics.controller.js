@@ -23,7 +23,10 @@ exports.getDashboardStats = async (req, res, next) => {
         // been invoiced but not yet marked delivered.
         supabase.from('orders').select('total_amount, order_date, status, customer_id').in('status', BILLABLE_ORDER_STATUSES)
           .gte('order_date', range.start).lte('order_date', range.end),
-        supabase.from('orders').select('id, status').neq('status', 'cancelled')
+        // Every status, not just the non-cancelled ones: the pipeline chart needs
+        // cancellations too, and deriving both from one result keeps the KPI and
+        // the chart describing the same set of orders.
+        supabase.from('orders').select('id, status')
           .gte('order_date', range.start).lte('order_date', range.end),
         supabase.from('orders').select('id, total_amount, status')
           .gte('order_date', range.previous.start).lte('order_date', range.previous.end),
@@ -32,7 +35,7 @@ exports.getDashboardStats = async (req, res, next) => {
       ]);
 
     const revMTD = (billableRange || []).reduce((s, o) => s + Number(o.total_amount || 0), 0);
-    const ordersMTD = (ordersInRange || []).length;
+    const ordersMTD = (ordersInRange || []).filter((o) => o.status !== 'cancelled').length;
 
     const revPrev = (ordersPrevRange || []).filter((o) => BILLABLE_ORDER_STATUSES.includes(o.status)).reduce((s, o) => s + Number(o.total_amount || 0), 0);
     const ordersPrev = (ordersPrevRange || []).filter((o) => o.status !== 'cancelled').length;
@@ -57,6 +60,10 @@ exports.getDashboardStats = async (req, res, next) => {
       const span = range.period === 'year' ? [1, 12] : [(range.quarter - 1) * 3 + 1, (range.quarter - 1) * 3 + 3];
       for (let m = span[0]; m <= span[1]; m++) {
         const b = fyMonthBounds(range.fy, m);
+        // A month that has not started yet is not "a month with no sales" — it
+        // is not a data point at all. Plotting it drew a line to zero for the
+        // rest of the financial year.
+        if (b.start > range.end) break;
         const key = b.start.slice(0, 7);
         chartMonths.push({ month: `${key}-01`, revenue: buckets[key] || 0 });
       }
@@ -126,9 +133,20 @@ exports.getDashboardStats = async (req, res, next) => {
  
     const expensesMTD = (monthExp || []).filter(e => e.type === 'expense').reduce((s, e) => s + Number(e.amount || 0), 0);
     const loggedRevenueMTD = (monthExp || []).filter(e => e.type === 'revenue').reduce((s, e) => s + Number(e.amount || 0), 0);
- 
+
+    // Two different questions, so two different counts.
+    //
+    // The pipeline chart answers "how did THIS period's orders break down", so
+    // it follows the period selector like every other widget — it used to show
+    // every order ever regardless of the period, which made the chart the one
+    // thing on the page that never changed.
     const statusDist = {};
-    (allOrderStatuses || []).forEach(o => { statusDist[o.status] = (statusDist[o.status] || 0) + 1; });
+    (ordersInRange || []).forEach(o => { statusDist[o.status] = (statusDist[o.status] || 0) + 1; });
+ 
+    // "Needs attention" asks "what is sitting in draft right now", which is a
+    // standing alert and deliberately not period-scoped — a draft from March is
+    // still unconfirmed in August.
+    const draftOrdersAllTime = (allOrderStatuses || []).filter(o => o.status === 'draft').length;
  
     const cultivatedAcres = (cropSetups || []).reduce((s, c) => s + Number(c.area_acres || 0), 0);
 
@@ -175,6 +193,12 @@ exports.getDashboardStats = async (req, res, next) => {
           end: range.end,
           grain: range.grain,
           compared_to: range.previous.label,
+          // The UI says "as of <date>" when the period is still running, so the
+          // reader knows a part-year figure is not a whole-year one.
+          partial: Boolean(range.partial),
+          as_of: range.as_of || null,
+          full_end: range.full_end || range.end,
+          empty: Boolean(range.empty),
         },
         financial_years: selectableFinancialYears(now),
         kpi: {
@@ -202,7 +226,7 @@ exports.getDashboardStats = async (req, res, next) => {
           crops_tracked: (cropSetups || []).length,
           expenses_mtd: expensesMTD,
           farm_revenue_logged_mtd: loggedRevenueMTD,
-          draft_orders: statusDist.draft || 0,
+          draft_orders: draftOrdersAllTime,
         },
         order_status_distribution: Object.entries(statusDist).map(([status, count]) => ({ status, count })),
         recent_activity: recentAudit || [],

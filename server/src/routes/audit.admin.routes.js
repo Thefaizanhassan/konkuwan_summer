@@ -5,5 +5,6 @@ const { authenticate, authorize } = require('../middlewares/auth');
 router.use(authenticate);
 router.use(authorize('super_admin', 'order_manager', 'viewer')); // viewer can see logs
 
+router.get('/export', auditController.exportLogs); // must precede '/'
 router.get('/', auditController.getLogs);
 module.exports = router;

@@ -1,14 +1,17 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import AuthProvider from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Layouts
 import PublicLayout from './components/layout/PublicLayout';
 import AdminLayout from './components/layout/AdminLayout';
 
-// Public Pages
+// Public pages are eager: they are the first paint for anyone arriving from a
+// search result, and they are small.
 import Home from './pages/Home';
 import Products from './pages/Products';
 import Supply from './pages/Supply';
@@ -17,31 +20,60 @@ import Partners from './pages/Partners';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import SetPassword from './pages/SetPassword';
-
-// Admin Pages
 import Login from './pages/admin/Login';
-import Dashboard from './pages/admin/Dashboard';
-import ProductManagement from './pages/admin/ProductManagement';
-import OrderManagement from './pages/admin/OrderManagement';
-import CustomerManagement from './pages/admin/CustomerManagement';
-import CustomerProfile from './pages/admin/CustomerProfile';
-import DeliveryChallan from './pages/admin/DeliveryChallan';
-import WarehouseManagement from './pages/admin/WarehouseManagement';
-import Finance from './pages/admin/Finance';
-import Account from './pages/admin/Account';
-import ContactInbox from './pages/admin/ContactInbox';
-import UserManagement from './pages/admin/UserManagement';
-import AuditLogs from './pages/admin/AuditLogs';
-import Settings from './pages/admin/Settings';
-import FarmDashboard from './pages/admin/Farm/index';
 
-const queryClient = new QueryClient();
+// Admin pages are lazy. They pull in Recharts, jsPDF and PapaParse — roughly a
+// megabyte that a visitor reading the public site was downloading and never
+// using. Splitting here keeps that cost on the screens that need it.
+const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
+const ProductManagement = lazy(() => import('./pages/admin/ProductManagement'));
+const OrderManagement = lazy(() => import('./pages/admin/OrderManagement'));
+const CustomerManagement = lazy(() => import('./pages/admin/CustomerManagement'));
+const CustomerProfile = lazy(() => import('./pages/admin/CustomerProfile'));
+const DeliveryChallan = lazy(() => import('./pages/admin/DeliveryChallan'));
+const WarehouseManagement = lazy(() => import('./pages/admin/WarehouseManagement'));
+const Finance = lazy(() => import('./pages/admin/Finance'));
+const Account = lazy(() => import('./pages/admin/Account'));
+const ContactInbox = lazy(() => import('./pages/admin/ContactInbox'));
+const UserManagement = lazy(() => import('./pages/admin/UserManagement'));
+const AuditLogs = lazy(() => import('./pages/admin/AuditLogs'));
+const Settings = lazy(() => import('./pages/admin/Settings'));
+const FarmDashboard = lazy(() => import('./pages/admin/Farm/index'));
+ 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // A dashboard figure that is a minute old is fine; refetching every list
+      // on every window focus is not.
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      // One retry catches a blip. Retrying a 401 or a 403 three times just
+      // delays the error the user needs to see.
+      retry: (count, error) => {
+        const status = error?.response?.status;
+        if (status && status >= 400 && status < 500) return false;
+        return count < 1;
+      },
+    },
+  },
+});
+ 
+// Shown while a lazy admin chunk downloads.
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center py-24">
+      <div className="w-8 h-8 border-2 border-forest border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+          <Suspense fallback={<RouteFallback />}>
           <Routes>
             {/* ================= PUBLIC ROUTES ================= */}
             <Route element={<PublicLayout />}>
@@ -58,151 +90,61 @@ export default function App() {
             <Route path="/admin/login" element={<Login />} />
             <Route path="/set-password" element={<SetPassword />} />
 
-            {/* ================= PROTECTED ADMIN ROUTES ================= */}
-            <Route element={<ProtectedRoute allowedRoles={[]} />}>
+            {/* ================= PROTECTED ADMIN ROUTES =================
+                Each screen carries the same role list the server enforces on the
+                endpoints it calls — see client/src/lib/accessControl.js. The
+                outer route only checks that someone is signed in; the inner
+                ones check the role, so an unauthorised deep link redirects
+                instead of rendering a page whose every request will 403. */}
+            <Route element={<ProtectedRoute />}>
               <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="products" element={<ProductManagement />} />
-                <Route path="orders" element={<OrderManagement />} />
-                <Route path="customers" element={<CustomerManagement />} />
-                <Route path="customers/:id" element={<CustomerProfile />} />
-                <Route path="challans" element={<DeliveryChallan />} />
-                <Route path="warehouses" element={<WarehouseManagement />} />
-                <Route path="finance" element={<Finance />} />
-                <Route path="inquiries" element={<ContactInbox />} />
-                <Route path="account" element={<Account />} />
-                <Route path="users" element={<UserManagement />} />
-                <Route path="audit-logs" element={<AuditLogs />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="farm/*" element={<FarmDashboard />} />
+                <Route element={<ProtectedRoute routeKey="dashboard" />}>
+                  <Route index element={<Dashboard />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="products" />}>
+                  <Route path="products" element={<ProductManagement />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="orders" />}>
+                  <Route path="orders" element={<OrderManagement />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="customers" />}>
+                  <Route path="customers" element={<CustomerManagement />} />
+                  <Route path="customers/:id" element={<CustomerProfile />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="challans" />}>
+                  <Route path="challans" element={<DeliveryChallan />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="warehouses" />}>
+                  <Route path="warehouses" element={<WarehouseManagement />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="finance" />}>
+                  <Route path="finance" element={<Finance />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="inquiries" />}>
+                  <Route path="inquiries" element={<ContactInbox />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="account" />}>
+                  <Route path="account" element={<Account />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="users" />}>
+                  <Route path="users" element={<UserManagement />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="auditLogs" />}>
+                  <Route path="audit-logs" element={<AuditLogs />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="settings" />}>
+                  <Route path="settings" element={<Settings />} />
+                </Route>
+                <Route element={<ProtectedRoute routeKey="farm" />}>
+                  <Route path="farm/*" element={<FarmDashboard />} />
+                </Route>
               </Route>
             </Route>
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
-
-// import { useState } from 'react'
-// import reactLogo from './assets/react.svg'
-// import viteLogo from './assets/vite.svg'
-// import heroImg from './assets/hero.png'
-// import './App.css'
-
-// function App() {
-//   const [count, setCount] = useState(0)
-
-//   return (
-//     <>
-//       <section id="center">
-//         <div className="hero">
-//           <img src={heroImg} className="base" width="170" height="179" alt="" />
-//           <img src={reactLogo} className="framework" alt="React logo" />
-//           <img src={viteLogo} className="vite" alt="Vite logo" />
-//         </div>
-//         <div>
-//           <h1>Get started</h1>
-//           <p>
-//             Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-//           </p>
-//         </div>
-//         <button
-//           type="button"
-//           className="counter"
-//           onClick={() => setCount((count) => count + 1)}
-//         >
-//           Count is {count}
-//         </button>
-//       </section>
-
-//       <div className="ticks"></div>
-
-//       <section id="next-steps">
-//         <div id="docs">
-//           <svg className="icon" role="presentation" aria-hidden="true">
-//             <use href="/icons.svg#documentation-icon"></use>
-//           </svg>
-//           <h2>Documentation</h2>
-//           <p>Your questions, answered</p>
-//           <ul>
-//             <li>
-//               <a href="https://vite.dev/" target="_blank">
-//                 <img className="logo" src={viteLogo} alt="" />
-//                 Explore Vite
-//               </a>
-//             </li>
-//             <li>
-//               <a href="https://react.dev/" target="_blank">
-//                 <img className="button-icon" src={reactLogo} alt="" />
-//                 Learn more
-//               </a>
-//             </li>
-//           </ul>
-//         </div>
-//         <div id="social">
-//           <svg className="icon" role="presentation" aria-hidden="true">
-//             <use href="/icons.svg#social-icon"></use>
-//           </svg>
-//           <h2>Connect with us</h2>
-//           <p>Join the Vite community</p>
-//           <ul>
-//             <li>
-//               <a href="https://github.com/vitejs/vite" target="_blank">
-//                 <svg
-//                   className="button-icon"
-//                   role="presentation"
-//                   aria-hidden="true"
-//                 >
-//                   <use href="/icons.svg#github-icon"></use>
-//                 </svg>
-//                 GitHub
-//               </a>
-//             </li>
-//             <li>
-//               <a href="https://chat.vite.dev/" target="_blank">
-//                 <svg
-//                   className="button-icon"
-//                   role="presentation"
-//                   aria-hidden="true"
-//                 >
-//                   <use href="/icons.svg#discord-icon"></use>
-//                 </svg>
-//                 Discord
-//               </a>
-//             </li>
-//             <li>
-//               <a href="https://x.com/vite_js" target="_blank">
-//                 <svg
-//                   className="button-icon"
-//                   role="presentation"
-//                   aria-hidden="true"
-//                 >
-//                   <use href="/icons.svg#x-icon"></use>
-//                 </svg>
-//                 X.com
-//               </a>
-//             </li>
-//             <li>
-//               <a href="https://bsky.app/profile/vite.dev" target="_blank">
-//                 <svg
-//                   className="button-icon"
-//                   role="presentation"
-//                   aria-hidden="true"
-//                 >
-//                   <use href="/icons.svg#bluesky-icon"></use>
-//                 </svg>
-//                 Bluesky
-//               </a>
-//             </li>
-//           </ul>
-//         </div>
-//       </section>
-
-//       <div className="ticks"></div>
-//       <section id="spacer"></section>
-//     </>
-//   )
-// }
-
-// export default App

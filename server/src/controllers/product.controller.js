@@ -3,6 +3,8 @@ const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
 const config = require('../config');
 const { createProductSchema, updateProductSchema } = require('../validations/product.validation');
+const { parsePagination } = require('../utils/pagination');
+const { sniffImageMime } = require('../utils/imageType');
 
 const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 async function uniqueSlug(base) {
@@ -16,9 +18,7 @@ async function uniqueSlug(base) {
 
 exports.getProducts = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const from = (page - 1) * limit;
+    const { page, limit, from } = parsePagination(req.query);
  
     let q = supabase
       .from('products')
@@ -158,11 +158,19 @@ exports.uploadProductImages = async (req, res, next) => {
     const bucket = config.upload.bucket;
     const uploaded = [];
     for (const [i, f] of files.entries()) {
-      const safeName = f.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      // multer filtered on the declared MIME type, which the client controls.
+      // Confirm the bytes really are one of the three formats before anything
+      // reaches a public bucket, and store the sniffed type rather than the
+      // claimed one.
+      const realMime = sniffImageMime(f.buffer);
+      if (!realMime) {
+        return next(new AppError(`"${f.originalname}" is not a valid JPEG, PNG or WebP image.`, 400));
+      }
+      const safeName = f.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_').slice(-80);
       const key = `${req.params.id}/${Date.now()}-${i}-${safeName}`;
       const { error: upErr } = await supabase.storage
         .from(bucket)
-        .upload(key, f.buffer, { contentType: f.mimetype, upsert: false });
+        .upload(key, f.buffer, { contentType: realMime, upsert: false });
       if (upErr) return next(new AppError(`Image upload failed: ${upErr.message}`, 500));
       uploaded.push({
         url: supabase.storage.from(bucket).getPublicUrl(key).data.publicUrl,

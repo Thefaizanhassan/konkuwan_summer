@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../services/api';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
+import safeUrl from '../../lib/safeUrl';
  
 const STATUS_COLORS = {
   delivered: 'bg-green-100 text-green-700',
@@ -54,7 +55,7 @@ export default function CustomerProfile() {
               {customer.phone && <p><span className="text-muted">{t('common.phone')}:</span> {customer.phone}</p>}
               {customer.gstin && <p><span className="text-muted">{t('customers.gstin')}:</span> {customer.gstin}</p>}
               {customer.address && <p className="sm:col-span-2"><span className="text-muted">{t('common.address')}:</span> {customer.address}</p>}
-              {customer.linkedin_url && <p className="sm:col-span-2"><a href={customer.linkedin_url} target="_blank" rel="noreferrer" className="text-sage hover:text-forest">{t('customers.linkedin')} ↗</a></p>}
+              {safeUrl(customer.linkedin_url) && <p className="sm:col-span-2"><a href={safeUrl(customer.linkedin_url)} target="_blank" rel="noopener noreferrer" className="text-sage hover:text-forest">{t('customers.linkedin')} ↗</a></p>}
               {customer.notes && <p className="sm:col-span-2"><span className="text-muted">{t('common.notes')}:</span> {customer.notes}</p>}
             </div>
           </div>

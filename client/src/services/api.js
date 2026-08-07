@@ -29,15 +29,24 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Handle unauthorized users
+// Sign out only when the session is genuinely gone.
+//
+// Previously any 401 signed the user out and hard-redirected. But a 401 can
+// also mean "this account was deactivated" or come from one background query
+// while the session is perfectly valid — and the redirect discarded whatever
+// the user was typing. Ask Supabase whether a session still exists before
+// throwing the session away; if it does, let the caller handle the error.
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      await supabase.auth.signOut();
-      window.location.href = '/admin/login';
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        await supabase.auth.signOut();
+        // replace(), not href: a dead session should not sit in the back stack.
+        window.location.replace('/admin/login');
+      }
     }
-
     return Promise.reject(error);
   }
 );

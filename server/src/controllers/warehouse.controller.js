@@ -1,6 +1,7 @@
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
+const { orFilter, requireUuid } = require('../utils/pgrst');
 const {
   createWarehouseSchema,
   updateWarehouseSchema,
@@ -143,7 +144,10 @@ exports.remove = async (req, res, next) => {
     const { count } = await supabase
       .from('delivery_challans')
       .select('id', { count: 'exact', head: true })
-      .or(`source_warehouse_id.eq.${req.params.id},destination_warehouse_id.eq.${req.params.id}`);
+      .or(orFilter([
+        ['source_warehouse_id', 'eq', requireUuid(req.params.id, 'id')],
+        ['destination_warehouse_id', 'eq', req.params.id],
+      ]));
  
     if (count > 0) {
       return next(

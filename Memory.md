@@ -94,7 +94,18 @@ Reverse chronological. Dates are when the work landed.
 ### 2026-07-30 — Single-Worker deployment
 **Files:** `wrangler.jsonc`, `worker.js` (new), removed `server/src/models/**`, legacy auth, `config/database.js`; `middlewares/upload.js`, `product.controller.js`, `utils/logger.js`, `client/src/services/api.js`
 **Why:** First deploy served a blank page — no wrangler config, so it uploaded `client/` including `node_modules` and served the unbuilt Vite template. Also removed Workers-incompatible dependencies, moved uploads to Supabase Storage, and replaced Winston file transports with a console sink.
- 
+
+### 2026-08-06 — Pre-production audit, hardening and Dockerization
+**Files:** `AUDIT.md`, `DEPLOYMENT.md`, `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `.env.docker.example` (all new); `utils/pgrst.js`, `utils/pagination.js`, `utils/imageType.js`, `lib/accessControl.js`, `lib/safeUrl.js`, `lib/csv.js`, `lib/revenueSeries.js`, `components/ErrorBoundary.jsx`, `vite-plugin-headers.js` (all new); `errorHandler.js`, `auth.js`, `app.js`, five controllers, `App.jsx`, `ProtectedRoute.jsx`, `Sidebar.jsx`, `Dashboard.jsx`, `AuditLogs.jsx`, `Pagination.jsx`
+**Why:** Full pre-production review. Two critical findings: PostgREST filter
+injection (a crafted `warehouse_id` turned a scoped query into an unscoped one —
+the service role bypasses RLS, so the filter string was the only limit), and raw
+database errors returned to the browser. Also: every admin route was
+client-side unprotected, `javascript:` URLs were rendered as links, the SPA
+carried no CSP, six endpoints had unbounded pagination, and the dashboard
+reported eight months into the future while comparing five months against
+twelve. See `AUDIT.md` for the full table.
+
 ### 2026-08-05 — Trilingual admin panel and regression review
 **Files:** `client/src/i18n/locales/hi.json` (new), `i18n/index.js`, `server/src/controllers/me.controller.js`, `routes/analytics.admin.routes.js`, `utils/dashboardWidgets.js`, `validations/order.validation.js`, `validations/challan.validation.js`, `controllers/analytics.controller.js`, `pages/admin/Dashboard.jsx`, all three locales
 **Why:** Added Hindi (673 keys, three-way parity). The regression review over Tasks 2–6 then found six defects — the worst being that a stakeholder was 403'd from `/api/admin/analytics/dashboard`, the one endpoint the whole role depends on, and that six granted widgets rendered nothing because they sat inside `{!restricted && …}` blocks. All fixed; see `TASKS.md` §4 for the full table.
@@ -163,7 +174,31 @@ unauthorised route is not a gate at all.
 presence, so `product_name: ''` satisfied "one of these is required" and let a
 line through with no product. `.empty(Joi.valid('', null))` makes the rule mean
 what it reads as, and turns a raw Postgres CHECK violation into a sentence.
+
+**PostgREST filter strings are built, never interpolated.** `.or()` takes a raw
+comma-separated condition list, so a user value spliced into it can add
+conditions of its own. `utils/pgrst.js` builds the clause from structured parts;
+search terms become quoted `ilike` literals and id parameters are validated as
+UUIDs. The service role bypasses RLS, which makes the filter string the only
+thing scoping a query — it is not a place for string concatenation.
  
+**5xx messages are generic; 4xx messages are not.** A 400 is written for the
+person reading it and must arrive intact. A 500 carries the database's own text —
+table names, column names, constraint names — and returning it hands out the
+schema. Production 5xx responses now carry a fixed sentence plus a correlation
+id that also appears in the log line.
+ 
+**One role→route table, mirrored not duplicated.** `client/src/lib/accessControl.js`
+lists the same roles as each server route file, and a check compares them. The
+server remains the only real gate; the table exists so the UI stops advertising
+pages the API refuses, and so a stakeholder cannot render User Management by
+typing the URL.
+ 
+**Security headers are set by whichever runtime serves the page.** On Cloudflare
+that is Static Assets reading a generated `_headers`; in a container it is
+Express. Helmet on `/api/*` protects neither, because the SPA never passes
+through it.
+
 **Joi aliased to its Node build.** The browser bundle strips the TLD list and throws on `.email()`. Aliasing keeps validation identical in dev and production instead of relaxing each validator.
  
 ---
@@ -215,5 +250,7 @@ Also update:
 | [RULES.md](./RULES.md) | Standards or conventions change |
 | [Phases.md](./Phases.md) | A milestone completes or a phase is added |
 | [Design.md](./Design.md) | Tokens, components or UI patterns change |
+| [AUDIT.md](./AUDIT.md) | A security or production-readiness finding is opened or closed |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Deployment steps, environment variables or targets change |
  
 Documentation drifting from the implementation is worse than no documentation, because it is trusted. If you cannot update a document in the same commit, say so in the commit body.

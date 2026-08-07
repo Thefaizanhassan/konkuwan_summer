@@ -2,6 +2,8 @@ const supabase = require('../config/supabaseAdmin');
 const { createCustomerSchema, updateCustomerSchema } = require('../validations/customer.validation');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
+const { orFilter, searchAcross, likeTerm } = require('../utils/pgrst');
+const { parsePagination } = require('../utils/pagination');
 
 // "Completed" orders for revenue purposes — the same definition the Finance
 // module and dashboard use, so totals agree across the platform.
@@ -24,14 +26,12 @@ async function purchaseTotals(customerIds) {
 
 exports.getAllCustomers = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const { page, limit, from } = parsePagination(req.query);
     const search = req.query.search;
-    const from = (page - 1) * limit;
 
     let q = supabase.from('customers').select('*', { count: 'exact' });
     if (search) {
-      q = q.or(`company_name.ilike.%${search}%,contact_person.ilike.%${search}%,email.ilike.%${search}%`);
+      q = q.or(searchAcross(['company_name', 'contact_person', 'email'], search));
     }
     // Works together with search: ?lead_status=active_customer|potential_lead
     if (req.query.lead_status && ['active_customer', 'potential_lead'].includes(req.query.lead_status)) {
@@ -183,10 +183,11 @@ exports.importCustomers = async (req, res, next) => {
       const { error: vErr, value } = createCustomerSchema.validate(customers[i], { stripUnknown: true });
       if (vErr) { summary.skipped++; summary.errors.push({ row: i + 1, company: customers[i].company_name || '—', reason: vErr.details[0].message }); continue; }
 
-      const orFilter = value.email
-        ? `company_name.ilike.${value.company_name},email.ilike.${value.email}`
-        : `company_name.ilike.${value.company_name}`;
-      const { data: dup } = await supabase.from('customers').select('id').or(orFilter).limit(1);
+      // An imported company name or email can contain a comma; interpolating
+      // it would restructure the filter rather than search for it.
+      const dupConditions = [['company_name', 'ilike', likeTerm(value.company_name)]];
+      if (value.email) dupConditions.push(['email', 'ilike', likeTerm(value.email)]);
+      const { data: dup } = await supabase.from('customers').select('id').or(orFilter(dupConditions)).limit(1);
       if (dup && dup.length) { summary.skipped++; summary.errors.push({ row: i + 1, company: value.company_name, reason: 'Duplicate (company or email exists)' }); continue; }
 
       const { error } = await supabase.from('customers').insert(value);

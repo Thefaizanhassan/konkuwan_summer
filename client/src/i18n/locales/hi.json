@@ -47,7 +47,8 @@
     "none": "—",
     "confirmDelete": "क्या आप वाकई इसे हटाना चाहते हैं?",
     "somethingWentWrong": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।",
-    "dragToReorder": "क्रम बदलने के लिए खींचें"
+    "dragToReorder": "क्रम बदलने के लिए खींचें",
+    "clearFilters": "फ़िल्टर हटाएँ"
   },
   "nav": {
     "dashboard": "डैशबोर्ड",
@@ -132,8 +133,10 @@
     "attentionInquiries": "{{count}} नई पूछताछ उत्तर की प्रतीक्षा में",
     "attentionDrafts": "{{count}} ड्राफ़्ट ऑर्डर अभी तक पुष्ट नहीं",
     "attentionVisits": "{{count}} किसानों से 2+ सप्ताह से भेंट नहीं",
-    "revenue12": "पिछले 12 महीनों का राजस्व",
+    "revenueTrend": "राजस्व रुझान",
     "monthlyRevenue": "मासिक राजस्व",
+    "asOf": "{{date}} तक",
+    "partialPeriod": "अवधि अभी चल रही है — आँकड़े {{date}} तक के हैं।",
     "noRevenue": "अभी कोई राजस्व डेटा नहीं",
     "topProducts": "शीर्ष उत्पाद",
     "noSales": "अभी कोई बिक्री डेटा नहीं",
@@ -586,7 +589,12 @@
     "action": "क्रिया",
     "entity": "इकाई",
     "details": "विवरण",
-    "noLogs": "कोई लॉग नहीं मिला।"
+    "noLogs": "कोई लॉग नहीं मिला।",
+    "fromDate": "दिनांक से",
+    "toDate": "दिनांक तक",
+    "nothingToExport": "इन फ़िल्टरों से कोई लॉग मेल नहीं खाता।",
+    "exportFailed": "निर्यात विफल रहा।",
+    "exportTruncated": "मेल खाने वाले {{total}} लॉग में से हाल के {{count}} निर्यात हुए। शेष के लिए दिनांक सीमा घटाएँ।"
   },
   "settings": {
     "title": "सिस्टम सेटिंग्स",

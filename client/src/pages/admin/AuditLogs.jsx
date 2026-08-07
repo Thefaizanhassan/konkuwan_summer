@@ -2,11 +2,33 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import apiClient from '../../services/api';
+import { downloadCsv, stamp } from '../../lib/csv';
+import Pagination from '../../components/ui/Pagination';
 
 export default function AuditLogs() {
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({ entity_type: '', action: '' });
+  const [filters, setFilters] = useState({ entity_type: '', action: '', from_date: '', to_date: '' });
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+ 
+  // Exports the whole filtered set, not the page on screen — the same filters
+  // go to the server, so what downloads is what the table is showing.
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError('');
+    try {
+      const { data: res } = await apiClient.get('/admin/audit-logs/export', { params: filters });
+      const rows = res.data || [];
+      if (!rows.length) { setExportError(t('audit.nothingToExport')); return; }
+      downloadCsv(rows, `konkuwan-audit-logs-${stamp()}`);
+      if (res.truncated) setExportError(t('audit.exportTruncated', { count: rows.length, total: res.total }));
+    } catch (err) {
+      setExportError(err?.response?.data?.message || t('audit.exportFailed'));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['audit-logs', page, filters],
@@ -25,7 +47,23 @@ export default function AuditLogs() {
 
   return (
     <div>
-      <h2 className="font-display text-3xl text-forest mb-6">{t('audit.title')}</h2>
+      <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+        <h2 className="font-display text-3xl text-forest">{t('audit.title')}</h2>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={exporting || isLoading}
+          className="text-sm font-semibold px-4 py-2.5 rounded-xl border border-border transition hover:bg-cream disabled:opacity-50"
+          style={{ color: '#2a5e3a' }}
+        >
+          {exporting ? t('common.exporting') : `⬇ ${t('common.exportCsv')}`}
+        </button>
+      </div>
+      {exportError && (
+        <p className="text-xs mb-4 rounded-xl px-3 py-2" style={{ background: '#FFF8EC', color: '#7C4A03' }} role="status">
+          {exportError}
+        </p>
+      )}
 
       <div className="flex gap-3 mb-6 flex-wrap">
         <select
@@ -45,6 +83,32 @@ export default function AuditLogs() {
           <option value="">{t('audit.allActions')}</option>
           {ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
+        <input
+          type="date"
+          value={filters.from_date}
+          max={filters.to_date || undefined}
+          onChange={e => { setFilters(f => ({ ...f, from_date: e.target.value })); setPage(1); }}
+          aria-label={t('audit.fromDate')}
+          className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
+        />
+        <input
+          type="date"
+          value={filters.to_date}
+          min={filters.from_date || undefined}
+          onChange={e => { setFilters(f => ({ ...f, to_date: e.target.value })); setPage(1); }}
+          aria-label={t('audit.toDate')}
+          className="border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20"
+        />
+        {(filters.entity_type || filters.action || filters.from_date || filters.to_date) && (
+          <button
+            type="button"
+            onClick={() => { setFilters({ entity_type: '', action: '', from_date: '', to_date: '' }); setPage(1); }}
+            className="text-sm px-3.5 py-2.5 rounded-xl border border-border hover:bg-cream transition"
+            style={{ color: '#6a7a63' }}
+          >
+            {t('common.clearFilters')}
+          </button>
+        )}
       </div>
 
       {isLoading ? (
@@ -88,18 +152,10 @@ export default function AuditLogs() {
         </div>
       )}
 
+      {/* The audit table grows without bound, and this rendered one button per
+          page — 200 pages meant 200 buttons. */}
       {pagination && pagination.pages > 1 && (
-        <div className="flex justify-center gap-2 mt-4">
-          {Array.from({ length: pagination.pages }, (_, i) => i + 1).map(p => (
-            <button
-              key={p}
-              onClick={() => setPage(p)}
-              className={`w-8 h-8 text-sm rounded-full ${p === page ? 'bg-forest text-white' : 'border border-border hover:bg-cream'}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+        <Pagination page={page} pages={pagination.pages} onChange={setPage} />
       )}
     </div>
   );

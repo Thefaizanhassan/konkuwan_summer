@@ -1,6 +1,7 @@
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
+const { parsePagination } = require('../utils/pagination');
 const {
   createOrderSchema,
   updateOrderSchema,
@@ -54,9 +55,7 @@ function companyBlock(s) {
 
 exports.getAllOrders = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const from = (page - 1) * limit;
+    const { page, limit, from } = parsePagination(req.query);
     const { status, customer_id, from_date, to_date } = req.query;
     const sort = req.query.sort || 'order_date';
     const ascending = (req.query.order || 'DESC').toUpperCase() === 'ASC';

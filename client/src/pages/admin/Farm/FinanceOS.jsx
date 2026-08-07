@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import apiClient from '../../../services/api';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
+import safeUrl from '../../../lib/safeUrl';
 
 // `label` is the English fallback — the UI renders t('finance.categories.<id>').
 const CATEGORIES = [
@@ -278,8 +279,8 @@ export default function FinanceOS() {
               <span>{cat?.emoji || '📦'}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{e.description}</p>
-                {e.receipt_url && (
-                  <a href={e.receipt_url} target="_blank" rel="noopener noreferrer"
+                {safeUrl(e.receipt_url) && (
+                  <a href={safeUrl(e.receipt_url)} target="_blank" rel="noopener noreferrer"
                      className="text-xs text-sage hover:text-forest">📎 {t('finance.receiptLink')}</a>
                 )}
                 <p className="text-xs text-muted">{e.date} · {e.logged_by_name}</p>

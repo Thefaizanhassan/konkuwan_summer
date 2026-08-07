@@ -1,6 +1,8 @@
 const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
+const { searchAcross } = require('../utils/pgrst');
+const { parsePagination } = require('../utils/pagination');
 const {
   buyerContactSchema,
   investorContactSchema,
@@ -55,15 +57,13 @@ exports.submitInvestor = async (req, res, next) => {
  
 exports.getSubmissions = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const from = (page - 1) * limit;
+    const { page, limit, from } = parsePagination(req.query);
     const { type, status, search } = req.query;
  
     let q = supabase.from('contact_submissions').select('*', { count: 'exact' });
     if (type) q = q.eq('type', type);
     if (status) q = q.eq('status', status);
-    if (search) q = q.or(`name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`);
+    if (search) q = q.or(searchAcross(['name', 'company', 'email'], search));
     q = q.order('created_at', { ascending: false }).range(from, from + limit - 1);
  
     const { data, count, error } = await q;

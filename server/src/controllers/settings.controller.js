@@ -18,9 +18,22 @@ exports.updateSettings = async (req, res, next) => {
     if (!Array.isArray(settings)) {
       return next(new AppError('Request body must contain a "settings" array.', 400));
     }
-    const rows = settings
-      .filter((s) => s && typeof s.key === 'string')
-      .map((s) => ({ key: s.key, value: s.value, updated_at: new Date().toISOString() }));
+    // The Settings screen deliberately exposes an "Other Settings" section for
+    // keys outside the known list, so an allow-list would break it. Bound the
+    // shape instead, so a single row cannot be used as bulk storage.
+    const MAX_KEY = 200;
+    const MAX_VALUE_BYTES = 20 * 1024;
+    const rows = [];
+    for (const s of settings) {
+      if (!s || typeof s.key !== 'string' || !s.key.trim()) continue;
+      if (s.key.length > MAX_KEY) {
+        return next(new AppError(`Setting key "${s.key.slice(0, 40)}…" is too long.`, 400));
+      }
+      if (JSON.stringify(s.value ?? '').length > MAX_VALUE_BYTES) {
+        return next(new AppError(`Value for "${s.key}" exceeds ${MAX_VALUE_BYTES / 1024} kB.`, 400));
+      }
+      rows.push({ key: s.key.trim(), value: s.value, updated_at: new Date().toISOString() });
+    }
 
     if (rows.length) {
       const { error } = await supabase.from('settings').upsert(rows, { onConflict: 'key' });

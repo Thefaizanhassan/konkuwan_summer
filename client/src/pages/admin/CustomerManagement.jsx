@@ -10,6 +10,7 @@ import Pagination from '../../components/ui/Pagination';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Papa from 'papaparse';
+import { downloadCsv, stamp } from '../../lib/csv';
 
 const customerApi = {
   list: (params) => apiClient.get('/admin/customers', { params }).then(r => r.data),
@@ -42,17 +43,15 @@ export default function CustomerManagement() {
       const { data: res } = await apiClient.get('/admin/customers/export');
       const rows = res.data || [];
       if (!rows.length) return alert(t('customers.nothingToExport'));
-      const csv = Papa.unparse(rows.map(r => ({
-        ...r,
-        created_at: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : '',
-      })));
-      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `konkuwan-customers-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // downloadCsv neutralises cells that would be read as formulas — a
+      // company name saved as =HYPERLINK(...) otherwise runs on open.
+      downloadCsv(
+        rows.map(r => ({
+          ...r,
+          created_at: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN') : '',
+        })),
+        `konkuwan-customers-${stamp()}`
+      );
     } catch (err) {
       alert(err?.response?.data?.message || t('customers.exportFailed'));
     } finally {
@@ -350,57 +349,3 @@ function ImportCustomersModal({ onClose, onDone }) {
     </Modal>
   );
 }
-/*
-function CustomerFormModal({ customer, onClose, onSubmit, isLoading }) {
-  const [form, setForm] = useState(customer || { company_name: '', contact_person: '', email: '', phone: '', address: '', gstin: '', notes: '' });
-
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(form);
-  };
-
-    return (
-        <Modal onClose={onClose}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <h3 className="font-display text-xl text-forest">{customer ? 'Edit Customer' : 'New Customer'}</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-muted">Company *</label>
-            <input name="company_name" value={form.company_name} onChange={handleChange} required className="w-full border border-border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-forest/20" />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-muted">Contact Person</label>
-            <input name="contact_person" value={form.contact_person} onChange={handleChange} className="w-full border p-2 rounded-sm" />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-muted">Email</label>
-            <input name="email" type="email" value={form.email} onChange={handleChange} className="w-full border p-2 rounded-sm" />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-muted">Phone</label>
-            <input name="phone" value={form.phone} onChange={handleChange} className="w-full border p-2 rounded-sm" />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-xs uppercase tracking-wide text-muted">Address</label>
-            <textarea name="address" value={form.address} onChange={handleChange} className="w-full border p-2 rounded-sm" rows={2} />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wide text-muted">GSTIN</label>
-            <input name="gstin" value={form.gstin} onChange={handleChange} className="w-full border p-2 rounded-sm" />
-          </div>
-          <div className="col-span-2">
-            <label className="block text-xs uppercase tracking-wide text-muted">Notes</label>
-            <textarea name="notes" value={form.notes} onChange={handleChange} className="w-full border p-2 rounded-sm" rows={2} />
-          </div>
-        </div>
-        <div className="flex justify-end gap-3">
-          <Button type="button" secondary onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save'}</Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-*/

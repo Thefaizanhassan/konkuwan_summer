@@ -2,6 +2,8 @@ const supabase = require('../config/supabaseAdmin');
 const AppError = require('../utils/AppError');
 const auditLog = require('../utils/audit');
 const { createChallanSchema } = require('../validations/challan.validation');
+const { orFilter, searchAcross, requireUuid } = require('../utils/pgrst');
+const { parsePagination } = require('../utils/pagination');
  
 const CHALLAN_SELECT =
   '*, farmer:farmers(id,name,village,block,address,phone), ' +
@@ -32,9 +34,7 @@ function financialYear(dateStr) {
  
 exports.getAllChallans = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const from = (page - 1) * limit;
+    const { page, limit, from } = parsePagination(req.query);
     const { farmer_id, from_date, to_date, search, challan_type, warehouse_id } = req.query;
  
     let q = supabase.from('delivery_challans').select(CHALLAN_SELECT, { count: 'exact' });
@@ -42,11 +42,15 @@ exports.getAllChallans = async (req, res, next) => {
     if (challan_type) q = q.eq('challan_type', challan_type);
     // Either end of a movement counts as "this warehouse was involved".
     if (warehouse_id) {
-      q = q.or(`source_warehouse_id.eq.${warehouse_id},destination_warehouse_id.eq.${warehouse_id}`);
+      requireUuid(warehouse_id, 'warehouse_id');
+      q = q.or(orFilter([
+        ['source_warehouse_id', 'eq', warehouse_id],
+        ['destination_warehouse_id', 'eq', warehouse_id],
+      ]));
     }
     if (from_date) q = q.gte('challan_date', from_date);
     if (to_date) q = q.lte('challan_date', to_date);
-    if (search) q = q.or(`challan_number.ilike.%${search}%,farmer_name.ilike.%${search}%`);
+    if (search) q = q.or(searchAcross(['challan_number', 'farmer_name'], search));
     q = q.order('challan_date', { ascending: false }).range(from, from + limit - 1);
  
     const { data, count, error } = await q;

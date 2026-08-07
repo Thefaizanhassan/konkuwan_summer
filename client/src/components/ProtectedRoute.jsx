@@ -1,7 +1,20 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-
-export default function ProtectedRoute({ allowedRoles = [] }) {
+import { canAccess, landingRouteFor } from '../lib/accessControl';
+ 
+/**
+ * Two jobs, chosen by whether `routeKey` is given:
+ *
+ *   no routeKey  — "must be signed in", nothing more.
+ *   routeKey     — "must be signed in AND hold a role that can open this
+ *                  screen", per lib/accessControl.js.
+ *
+ * The previous version took `allowedRoles` and treated an empty array as
+ * "everyone", which is what every admin route passed — so role checks were
+ * silently absent. Naming the screen instead of listing roles at the call site
+ * means the list lives in one place and cannot drift per route.
+ */
+export default function ProtectedRoute({ routeKey }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -19,45 +32,11 @@ export default function ProtectedRoute({ allowedRoles = [] }) {
     return <Navigate to="/admin/login" replace />;
   }
 
-  const userRole = user.profile?.role;
-  const hasPermission = allowedRoles.length === 0 || allowedRoles.includes(userRole);
+  const role = user.profile?.role;
 
-  if (!hasPermission) {
-    return <Navigate to="/admin" replace />;
+  if (routeKey && !canAccess(routeKey, role)) {
+    return <Navigate to={landingRouteFor(role)} replace />;
   }
 
   return <Outlet />;
 }
-
-/* initial code
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-
-export default function ProtectedRoute({ allowedRoles = [] }) {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-cream">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-forest mx-auto"></div>
-          <p className="mt-4 text-forest font-medium">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/admin/login" replace />;
-  }
-
-  const userRole = user.profile?.role; // Supabase profile
-  const hasPermission = allowedRoles.length === 0 || allowedRoles.includes(userRole);
-
-  if (!hasPermission) {
-    return <Navigate to="/admin" replace />;
-  }
-
-  return <Outlet />;
-}
-*/
